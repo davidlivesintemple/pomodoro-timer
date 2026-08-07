@@ -78,6 +78,12 @@
     font-size:12px; line-height:1.7; color:var(--muted); text-align:left;
     max-height:190px; overflow:auto; box-shadow:0 4px 14px rgba(0,0,0,.15); z-index:9;
   }
+  #hist .row{ white-space:nowrap }
+  #hist .x{
+    display:inline-block; margin-left:8px; padding:0 4px; font-weight:400;
+    opacity:.35; cursor:pointer;
+  }
+  #hist .x:hover{ opacity:1; color:var(--focus) }
 </style>
 </head>
 <body>
@@ -133,8 +139,13 @@
       localStorage.removeItem('pomo-log');
     }catch(e){}
     prune();
-    log = store[curDay] = store[curDay] || blank();
+    log = useDay(curDay);
   })();
+  // 取某天的可用记录;墓碑(已删除)当成空记录
+  function useDay(d){
+    if(!store[d] || store[d].del) store[d] = blank();
+    return store[d];
+  }
   function prune(){   // 只留最近 365 天
     var cutoff = new Date(Date.now()+8*3600e3-365*86400e3).toISOString().slice(0,10);
     for(var k in store){ if(k<cutoff) delete store[k] }
@@ -145,7 +156,7 @@
     schedulePush();
   }
   function checkDay(){
-    if(curDay!==today()){ curDay=today(); log = store[curDay] = store[curDay] || blank(); save() }
+    if(curDay!==today()){ curDay=today(); log = useDay(curDay); save() }
   }
 
   // ── 云端同步 ────────────────────────────────────────────────
@@ -199,7 +210,7 @@
       .then(function(remote){
         var changed = merge(remote);
         prune();
-        log = store[curDay] = store[curDay] || blank();
+        log = useDay(curDay);
         try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){}
         setDot('ok');
         render();
@@ -354,16 +365,29 @@
   function renderHist(){
     var days = Object.keys(store).sort().reverse(), h='';
     for(var i=0;i<days.length;i++){
-      var d = store[days[i]], r = roundsOf(d);
-      if(!(d.f||d.s||d.l||(d.seq&&d.seq.length))) continue;
-      h += '<div>'+days[i].slice(5).replace('-','/')
+      var k = days[i], d = store[k], r = roundsOf(d);
+      if(d.del || !(d.f||d.s||d.l||(d.seq&&d.seq.length))) continue;
+      h += '<div class="row" data-d="'+k+'">'+k.slice(5).replace('-','/')
          + '&nbsp; 🍅×'+(d.f||0)
          + (d.s ? '&nbsp; ☕×'+d.s : '')
          + (d.l ? '&nbsp; 🛋×'+d.l : '')
          + (r ? '&nbsp; ✅×'+r : '')
-         + '</div>';
+         + '<b class="x" title="删除这一天">×</b></div>';
     }
     histEl.innerHTML = h || '<div>暂无记录</div>';
+    var xs = histEl.querySelectorAll('.x');
+    for(var j=0;j<xs.length;j++){
+      xs[j].onclick = function(e){
+        e.stopPropagation();
+        var k = this.parentNode.getAttribute('data-d');
+        if(!confirm('删除 '+k+' 的记录?')) return;
+        store[k] = { del:1, u:Date.now() };   // 墓碑,让另一台设备也删掉
+        if(k===curDay) log = useDay(curDay);
+        try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e2){}
+        schedulePush();
+        renderHist(); render();
+      };
+    }
   }
   document.getElementById('log').onclick = function(e){
     e.stopPropagation();
