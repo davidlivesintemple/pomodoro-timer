@@ -366,14 +366,18 @@
     histEl.style.display = histEl.style.display==='block' ? 'none' : 'block';
   };
   document.addEventListener('click', function(){ histEl.style.display='none' });
-  // 整体等比缩放:窗口小就缩,窗口大就放大填满,最大 2 倍
+  // 整体等比缩放,实测卡片尺寸后填满可视区(留一点边距)
   var card=document.querySelector('.card');
   function fit(){
-    var s=Math.min(window.innerHeight/460, window.innerWidth/330);
-    card.style.transform='scale('+Math.max(0.5, Math.min(2, s))+')';
+    card.style.transform='none';
+    var w=card.offsetWidth, h=card.offsetHeight;
+    if(!w || !h) return;
+    var s=Math.min(window.innerWidth*0.96/w, window.innerHeight*0.96/h);
+    card.style.transform='scale('+Math.max(0.4, Math.min(3, s))+')';
   }
   window.addEventListener('resize', fit);
   fit();
+  setTimeout(fit, 300);   // 等表情字体加载完再量一次
   render();
   pull();
 })();
