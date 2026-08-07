@@ -17,9 +17,9 @@
   body{
     background:var(--bg); color:var(--fg);
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
-    display:flex; align-items:center; justify-content:center;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
   }
-  .card{ text-align:center; padding:20px 16px; user-select:none }
+  .card{ text-align:center; padding:20px 16px; user-select:none; transform-origin:center }
   .tabs{ display:inline-flex; gap:4px; background:var(--track); border-radius:999px; padding:4px; margin-bottom:14px }
   .tabs button{
     border:0; background:transparent; color:var(--muted); font-size:13px;
@@ -200,6 +200,14 @@
   document.getElementById('t-focus').onclick=function(){ setMode('focus') };
   document.getElementById('t-short').onclick=function(){ setMode('short') };
   document.getElementById('t-long').onclick=function(){ setMode('long') };
+  // 窗口太矮/太窄时整体等比缩小,保证完整显示
+  var card=document.querySelector('.card');
+  function fit(){
+    var s=Math.min(1, window.innerHeight/470, window.innerWidth/320);
+    card.style.transform='scale('+s+')';
+  }
+  window.addEventListener('resize', fit);
+  fit();
   render();
 })();
 </script>
