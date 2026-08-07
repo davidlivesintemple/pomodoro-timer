@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>番茄钟</title>
+<style>
+  :root{
+    --bg:#ffffff; --fg:#37352f; --muted:#9b9a97; --track:#eeedeb;
+    --focus:#e5484d; --break:#2f9e6e; --long:#3a7bd5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#191919; --fg:#e8e8e6; --muted:#8a8a86; --track:#2e2e2e; }
+  }
+  *{box-sizing:border-box; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .card{ text-align:center; padding:20px 16px; user-select:none }
+  .tabs{ display:inline-flex; gap:4px; background:var(--track); border-radius:999px; padding:4px; margin-bottom:14px }
+  .tabs button{
+    border:0; background:transparent; color:var(--muted); font-size:13px;
+    padding:5px 14px; border-radius:999px; cursor:pointer; font-family:inherit;
+  }
+  .tabs button.on{ background:var(--bg); color:var(--fg); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12) }
+  /* 本轮循环进度:25-5-25-5-25-5-25-20 */
+  .strip{ display:flex; gap:7px; justify-content:center; margin-bottom:16px; font-size:15px; line-height:1.6 }
+  .strip i{ font-style:normal; opacity:.2; transition:all .2s; position:relative }
+  .strip i.done{ opacity:1 }
+  .strip i.cur{ opacity:1; transform:scale(1.3) }
+  .strip i.cur::after{
+    content:''; position:absolute; left:1px; right:1px; bottom:-4px; height:3px;
+    border-radius:2px; background:var(--accent,var(--focus));
+  }
+  .ring{ position:relative; width:230px; height:230px; margin:0 auto 18px }
+  .ring svg{ transform:rotate(-90deg) }
+  .ring circle{ fill:none; stroke-width:8; stroke-linecap:round }
+  .ring .track{ stroke:var(--track) }
+  .ring .bar{ stroke:var(--accent,var(--focus)); transition:stroke-dashoffset .3s linear, stroke .3s }
+  .time{
+    position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  }
+  .time b{ font-size:52px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:1px; cursor:pointer }
+  .time span{ font-size:13px; color:var(--muted); margin-top:2px }
+  #clock-in{
+    font-family:inherit; font-size:44px; font-weight:600; font-variant-numeric:tabular-nums;
+    width:170px; text-align:center; background:transparent; color:var(--fg);
+    border:0; border-bottom:2px dashed var(--muted); outline:none;
+  }
+  .btns{ display:flex; gap:10px; justify-content:center }
+  .btns button{ font-family:inherit; font-size:15px; border-radius:10px; cursor:pointer; padding:10px 0 }
+  #main{
+    width:150px; border:0; color:#fff; background:var(--accent,var(--focus));
+    font-weight:600; letter-spacing:4px; box-shadow:0 3px 0 rgba(0,0,0,.18);
+  }
+  #main:active{ transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,.18) }
+  #reset{ width:64px; border:1.5px solid var(--track); background:transparent; color:var(--muted) }
+  #log{
+    position:fixed; right:10px; bottom:8px; font-size:11px; line-height:1.4;
+    color:var(--muted); opacity:.55; letter-spacing:1px; text-align:right; pointer-events:none;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="tabs">
+    <button id="t-focus" class="on">🍅 专注</button>
+    <button id="t-short">☕ 短休</button>
+    <button id="t-long">🛋 长休</button>
+  </div>
+  <div class="strip" id="strip" title="本轮进度:25-5-25-5-25-5-25-20"></div>
+  <div class="ring">
+    <svg width="230" height="230" viewBox="0 0 230 230">
+      <circle class="track" cx="115" cy="115" r="106"></circle>
+      <circle class="bar" id="bar" cx="115" cy="115" r="106"></circle>
+    </svg>
+    <div class="time"><b id="clock" title="点击修改剩余时间">25:00</b><span id="hint">保持专注</span></div>
+  </div>
+  <div class="btns">
+    <button id="main">开始</button>
+    <button id="reset" title="重置">↺</button>
+  </div>
+</div>
+<div id="log"></div>
+<script>
+(function(){
+  var MODES = {
+    focus:{sec:25*60, label:'保持专注', color:'var(--focus)', icon:'🍅'},
+    short:{sec: 5*60, label:'休息一下', color:'var(--break)', icon:'☕'},
+    long :{sec:20*60, label:'好好休息', color:'var(--long)', icon:'🛋'}
+  };
+  var SEQ = ['focus','short','focus','short','focus','short','focus','long'];
+  var C = 2*Math.PI*106;
+  var bar = document.getElementById('bar');
+  bar.style.strokeDasharray = C;
+  var mode='focus', remaining=MODES.focus.sec, running=false, endAt=0, timer=null, editing=false;
+  var clockEl = document.getElementById('clock');
+
+  // 每日记录,按北京时间(UTC+8)零点清零
+  function today(){ return new Date(Date.now()+8*3600e3).toISOString().slice(0,10) }
+  var log;
+  function load(){
+    try{
+      var o = JSON.parse(localStorage.getItem('pomo-log'));
+      if(o && o.d===today() && o.seq) return o;
+    }catch(e){}
+    return {d:today(), seq:[], rounds:0};
+  }
+  function save(){ try{ localStorage.setItem('pomo-log', JSON.stringify(log)) }catch(e){} }
+  function checkDay(){ if(log.d!==today()){ log={d:today(), seq:[], rounds:0}; save() } }
+  log = load();
+
+  function renderStrip(){
+    var pos = Math.min(log.seq.length, SEQ.length-1);
+    var h='';
+    for(var i=0;i<SEQ.length;i++){
+      h += '<i class="'+(i<log.seq.length?'done':(i===pos?'cur':''))+'">'+MODES[SEQ[i]].icon+'</i>';
+    }
+    document.getElementById('strip').innerHTML = h;
+  }
+  function renderLog(){
+    var s = (log.rounds>0 ? '✅×'+log.rounds+(log.seq.length?'  ':'') : '') + log.seq.join('');
+    document.getElementById('log').textContent = s;
+  }
+  function fmt(s){ var m=Math.floor(s/60), r=s%60; return (m<10?'0':'')+m+':'+(r<10?'0':'')+r }
+  function render(){
+    if(!editing) clockEl.textContent = fmt(remaining);
+    document.getElementById('hint').textContent = MODES[mode].label;
+    document.documentElement.style.setProperty('--accent', MODES[mode].color);
+    bar.style.stroke = MODES[mode].color;
+    bar.style.strokeDashoffset = C*(1-Math.min(1, remaining/MODES[mode].sec));
+    document.getElementById('main').textContent = running?'暂停':'开始';
+    var tabs={focus:'t-focus',short:'t-short',long:'t-long'};
+    for(var k in tabs) document.getElementById(tabs[k]).className = (k===mode?'on':'');
+    renderStrip();
+    renderLog();
+  }
+  function beep(){
+    try{
+      var ctx = new (window.AudioContext||window.webkitAudioContext)();
+      [0,.25,.5].forEach(function(t){
+        var o=ctx.createOscillator(), g=ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value=880; g.gain.setValueAtTime(.001,ctx.currentTime+t);
+        g.gain.exponentialRampToValueAtTime(.3,ctx.currentTime+t+.02);
+        g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.2);
+        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.22);
+      });
+    }catch(e){}
+  }
+  function stop(){ running=false; if(timer){clearInterval(timer); timer=null} }
+  function setMode(m){ stop(); mode=m; remaining=MODES[m].sec; render() }
+  function finish(){
+    stop(); beep(); checkDay();
+    log.seq.push(MODES[mode].icon);
+    if(mode==='long'){                       // 长休结束 = 一轮完整番茄钟
+      log.rounds++; log.seq=[]; save();
+      setMode('focus');
+    }else if(mode==='focus'){
+      var n = log.seq.filter(function(i){return i==='🍅'}).length;
+      save();
+      setMode(n>=4 ? 'long' : 'short');      // 第 4 个番茄后进入长休
+    }else{
+      save();
+      setMode('focus');
+    }
+  }
+  function tick(){
+    remaining = Math.max(0, Math.round((endAt-Date.now())/1000));
+    if(remaining===0) finish(); else render();
+  }
+  // 点击时间 → 直接输入从几分几秒开始倒计时(如 15:49 或 15)
+  clockEl.onclick = function(){
+    if(editing) return;
+    editing=true; stop();
+    var inp=document.createElement('input');
+    inp.id='clock-in'; inp.value=fmt(remaining); inp.inputMode='numeric';
+    clockEl.textContent=''; clockEl.appendChild(inp);
+    inp.focus(); inp.select();
+    function done(apply){
+      if(!editing) return;
+      editing=false;
+      if(apply){
+        var m=inp.value.trim().match(/^(\d{1,3})(?::([0-5]?\d))?$/);
+        if(m){ var s=(+m[1])*60+(+(m[2]||0)); if(s>0) remaining=Math.min(s,99*60+59); }
+      }
+      clockEl.removeChild(inp); render();
+    }
+    inp.onkeydown=function(e){ if(e.key==='Enter') done(true); else if(e.key==='Escape') done(false); };
+    inp.onblur=function(){ done(true) };
+  };
+  document.getElementById('main').onclick = function(){
+    if(running){ stop(); render(); }
+    else{ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); }
+  };
+  document.getElementById('reset').onclick = function(){ setMode(mode) };
+  document.getElementById('t-focus').onclick=function(){ setMode('focus') };
+  document.getElementById('t-short').onclick=function(){ setMode('short') };
+  document.getElementById('t-long').onclick=function(){ setMode('long') };
+  render();
+})();
+</script>
+</body>
+</html>
