@@ -60,7 +60,14 @@
   #reset{ width:64px; border:1.5px solid var(--track); background:transparent; color:var(--muted) }
   #log{
     position:fixed; right:10px; bottom:8px; font-size:11px; line-height:1.4;
-    color:var(--muted); opacity:.55; letter-spacing:1px; text-align:right; pointer-events:none;
+    color:var(--muted); opacity:.55; letter-spacing:1px; text-align:right; cursor:pointer;
+    min-width:24px; min-height:14px;
+  }
+  #hist{
+    display:none; position:fixed; right:8px; bottom:30px; background:var(--bg);
+    border:1px solid var(--track); border-radius:8px; padding:8px 12px;
+    font-size:12px; line-height:1.7; color:var(--muted); text-align:left;
+    max-height:190px; overflow:auto; box-shadow:0 4px 14px rgba(0,0,0,.15); z-index:9;
   }
 </style>
 </head>
@@ -84,7 +91,8 @@
     <button id="reset" title="重置">↺</button>
   </div>
 </div>
-<div id="log"></div>
+<div id="log" title="点击查看一年内记录"></div>
+<div id="hist"></div>
 <script>
 (function(){
   var MODES = {
@@ -99,19 +107,29 @@
   var mode='focus', remaining=MODES.focus.sec, running=false, endAt=0, timer=null, editing=false;
   var clockEl = document.getElementById('clock');
 
-  // 每日记录,按北京时间(UTC+8)零点清零
+  // 每日记录,按北京时间(UTC+8)零点切换新的一天,历史保存 365 天
   function today(){ return new Date(Date.now()+8*3600e3).toISOString().slice(0,10) }
-  var log;
-  function load(){
-    try{
+  var store={}, log, curDay=today();
+  function blank(){ return {seq:[], rounds:0, f:0, s:0, l:0} }
+  (function(){
+    try{ store = JSON.parse(localStorage.getItem('pomo-hist')) || {} }catch(e){ store={} }
+    try{ // 迁移旧的单日格式
       var o = JSON.parse(localStorage.getItem('pomo-log'));
-      if(o && o.d===today() && o.seq) return o;
+      if(o && o.d===curDay && !store[curDay]){
+        var f=o.seq.filter(function(i){return i==='🍅'}).length;
+        var s=o.seq.filter(function(i){return i==='☕'}).length;
+        store[curDay]={seq:o.seq, rounds:o.rounds, f:o.rounds*4+f, s:o.rounds*3+s, l:o.rounds};
+      }
+      localStorage.removeItem('pomo-log');
     }catch(e){}
-    return {d:today(), seq:[], rounds:0};
+    var cutoff = new Date(Date.now()+8*3600e3-365*86400e3).toISOString().slice(0,10);
+    for(var k in store){ if(k<cutoff) delete store[k] }
+    log = store[curDay] = store[curDay] || blank();
+  })();
+  function save(){ try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){} }
+  function checkDay(){
+    if(curDay!==today()){ curDay=today(); log = store[curDay] = store[curDay] || blank(); save() }
   }
-  function save(){ try{ localStorage.setItem('pomo-log', JSON.stringify(log)) }catch(e){} }
-  function checkDay(){ if(log.d!==today()){ log={d:today(), seq:[], rounds:0}; save() } }
-  log = load();
 
   function renderStrip(){
     var pos = Math.min(log.seq.length, SEQ.length-1);
@@ -123,7 +141,7 @@
   }
   function renderLog(){
     var s = (log.rounds>0 ? '✅×'+log.rounds+(log.seq.length?'  ':'') : '') + log.seq.join('');
-    document.getElementById('log').textContent = s;
+    document.getElementById('log').textContent = s || '记录';
   }
   function fmt(s){ var m=Math.floor(s/60), r=s%60; return (m<10?'0':'')+m+':'+(r<10?'0':'')+r }
   function render(){
@@ -156,6 +174,7 @@
   function finish(){
     stop(); beep(); checkDay();
     log.seq.push(MODES[mode].icon);
+    if(mode==='focus') log.f=(log.f||0)+1; else if(mode==='short') log.s=(log.s||0)+1; else log.l=(log.l||0)+1;
     if(mode==='long'){                       // 长休结束 = 一轮完整番茄钟
       log.rounds++; log.seq=[]; save();
       setMode('focus');
@@ -200,6 +219,23 @@
   document.getElementById('t-focus').onclick=function(){ setMode('focus') };
   document.getElementById('t-short').onclick=function(){ setMode('short') };
   document.getElementById('t-long').onclick=function(){ setMode('long') };
+  // 点击右下角记录 → 查看一年内每日历史
+  var histEl = document.getElementById('hist');
+  function renderHist(){
+    var days = Object.keys(store).sort().reverse(), h='';
+    for(var i=0;i<days.length;i++){
+      var d = store[days[i]];
+      if(!(d.f||d.rounds||(d.seq&&d.seq.length))) continue;
+      h += '<div>'+days[i].slice(5).replace('-','/')+'&nbsp; 🍅×'+(d.f||0)+(d.rounds?'&nbsp;✅×'+d.rounds:'')+'</div>';
+    }
+    histEl.innerHTML = h || '<div>暂无记录</div>';
+  }
+  document.getElementById('log').onclick = function(e){
+    e.stopPropagation();
+    renderHist();
+    histEl.style.display = histEl.style.display==='block' ? 'none' : 'block';
+  };
+  document.addEventListener('click', function(){ histEl.style.display='none' });
   // 窗口太矮/太窄时整体等比缩小,保证完整显示
   var card=document.querySelector('.card');
   function fit(){
