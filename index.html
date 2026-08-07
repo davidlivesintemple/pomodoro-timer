@@ -232,7 +232,7 @@
     inp.id='clock-in'; inp.value=fmt(remaining); inp.inputMode='numeric';
     clockEl.textContent=''; clockEl.appendChild(inp);
     inp.focus(); inp.select();
-    function done(apply){
+    function done(apply, start){
       if(!editing) return;
       editing=false;
       if(apply){
@@ -240,13 +240,15 @@
         if(m){ var s=(+m[1])*60+(+(m[2]||0)); if(s>0) remaining=Math.min(s,99*60+59); }
       }
       clockEl.removeChild(inp); render();
+      if(start && remaining>0) startTimer();   // 回车直接开始倒计时
     }
-    inp.onkeydown=function(e){ if(e.key==='Enter') done(true); else if(e.key==='Escape') done(false); };
+    inp.onkeydown=function(e){ if(e.key==='Enter') done(true, true); else if(e.key==='Escape') done(false); };
     inp.onblur=function(){ done(true) };
   };
+  function startTimer(){ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); }
   document.getElementById('main').onclick = function(){
     if(running){ stop(); render(); }
-    else{ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); }
+    else{ startTimer(); }
   };
   document.getElementById('reset').onclick = function(){ guard('reset', function(){ setMode(mode) }) };
   document.getElementById('t-focus').onclick=function(){ guard('focus', function(){ setMode('focus') }) };
