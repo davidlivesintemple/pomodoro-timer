@@ -65,6 +65,13 @@
     color:var(--muted); opacity:.55; letter-spacing:1px; text-align:right; cursor:pointer;
     min-width:24px; min-height:14px;
   }
+  #dot{
+    position:fixed; left:10px; bottom:11px; width:7px; height:7px; border-radius:50%;
+    background:var(--track); transition:background .3s;
+  }
+  #dot.ok{ background:var(--break) }
+  #dot.busy{ background:var(--muted) }
+  #dot.err{ background:var(--focus) }
   #hist{
     display:none; position:fixed; right:8px; bottom:30px; background:var(--bg);
     border:1px solid var(--track); border-radius:8px; padding:8px 12px;
@@ -95,6 +102,7 @@
 </div>
 <div id="log" title="点击查看一年内记录"></div>
 <div id="hist"></div>
+<div id="dot" title="同步状态"></div>
 <script>
 (function(){
   var MODES = {
@@ -112,7 +120,7 @@
   // 每日记录,按北京时间(UTC+8)零点切换新的一天,历史保存 365 天
   function today(){ return new Date(Date.now()+8*3600e3).toISOString().slice(0,10) }
   var store={}, log, curDay=today();
-  function blank(){ return {seq:[], rounds:0, f:0, s:0, l:0} }
+  function blank(){ return {seq:[], rounds:0, f:0, s:0, l:0, u:0} }
   (function(){
     try{ store = JSON.parse(localStorage.getItem('pomo-hist')) || {} }catch(e){ store={} }
     try{ // 迁移旧的单日格式
@@ -120,18 +128,89 @@
       if(o && o.d===curDay && !store[curDay]){
         var f=o.seq.filter(function(i){return i==='🍅'}).length;
         var s=o.seq.filter(function(i){return i==='☕'}).length;
-        store[curDay]={seq:o.seq, rounds:o.rounds, f:o.rounds*4+f, s:o.rounds*3+s, l:o.rounds};
+        store[curDay]={seq:o.seq, rounds:o.rounds, f:o.rounds*4+f, s:o.rounds*3+s, l:o.rounds, u:Date.now()};
       }
       localStorage.removeItem('pomo-log');
     }catch(e){}
-    var cutoff = new Date(Date.now()+8*3600e3-365*86400e3).toISOString().slice(0,10);
-    for(var k in store){ if(k<cutoff) delete store[k] }
+    prune();
     log = store[curDay] = store[curDay] || blank();
   })();
-  function save(){ try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){} }
+  function prune(){   // 只留最近 365 天
+    var cutoff = new Date(Date.now()+8*3600e3-365*86400e3).toISOString().slice(0,10);
+    for(var k in store){ if(k<cutoff) delete store[k] }
+  }
+  function save(){
+    if(log) log.u = Date.now();
+    try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){}
+    schedulePush();
+  }
   function checkDay(){
     if(curDay!==today()){ curDay=today(); log = store[curDay] = store[curDay] || blank(); save() }
   }
+
+  // ── 云端同步 ────────────────────────────────────────────────
+  // 同步码从网址取(?k=...),不写在代码里。没有它就退回纯本地模式。
+  // iPhone 的 Notion 里第三方页面的本地存储退出 app 就没,所以每次开页都先拉云端。
+  var API = 'https://pomodoro-sync.pomodoro-worker.workers.dev';
+  var KEY = (location.search.match(/[?&]k=([A-Za-z0-9_-]{16,64})/) || [])[1] || '';
+  var dot = document.getElementById('dot');
+  function setDot(c){ dot.className = c || '' }
+  function endpoint(){ return API + '/d/' + KEY }
+
+  // 逐日取较新的一份;某天只存在于一边就直接保留
+  function merge(remote){
+    var changed = false;
+    for(var d in remote){
+      var r = remote[d];
+      if(!r || typeof r!=='object' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      var l = store[d];
+      if(!l || (r.u||0) > (l.u||0)){ store[d] = r; changed = true; }
+    }
+    return changed;
+  }
+
+  var pushT=null, pushing=false, pushAgain=false;
+  function schedulePush(){
+    if(!KEY) return;
+    clearTimeout(pushT);
+    pushT = setTimeout(push, 1200);   // 合并连续改动,少发请求
+  }
+  function push(){
+    if(!KEY) return;
+    if(pushing){ pushAgain = true; return }
+    pushing = true; setDot('busy');
+    fetch(endpoint(), {
+      method:'PUT', credentials:'omit',
+      headers:{'content-type':'application/json'},
+      body: JSON.stringify(store)
+    }).then(function(r){
+      setDot(r.ok ? 'ok' : 'err');
+    }).catch(function(){ setDot('err') })
+      .then(function(){
+        pushing = false;
+        if(pushAgain){ pushAgain=false; schedulePush() }
+      });
+  }
+  function pull(){
+    if(!KEY){ setDot(''); return }
+    setDot('busy');
+    fetch(endpoint(), { credentials:'omit', cache:'no-store' })
+      .then(function(r){ if(!r.ok) throw 0; return r.json() })
+      .then(function(remote){
+        var changed = merge(remote);
+        prune();
+        log = store[curDay] = store[curDay] || blank();
+        try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){}
+        setDot('ok');
+        render();
+        if(changed) push();   // 把合并结果写回,让两端一致
+      })
+      .catch(function(){ setDot('err') });
+  }
+  // 回到前台时重新拉一次(手机切回来、电脑换标签页)
+  document.addEventListener('visibilitychange', function(){
+    if(!document.hidden) pull();
+  });
 
   function cnt(a,c){ return a.filter(function(x){return x===c}).length }
   // 计时进行中误点保护:需在 3 秒内再点一次才生效
@@ -170,8 +249,11 @@
       el.children[i].onclick = (function(idx){ return function(){ guard('p'+idx, function(){ setPos(idx) }) } })(i);
     }
   }
+  // 一轮 = 做满 4 个番茄。长休是恢复,没做完不影响这一轮算数。
+  function roundsOf(d){ return Math.floor((d.f||0)/4) }
   function renderLog(){
-    var s = (log.rounds>0 ? '✅×'+log.rounds+(log.seq.length?'  ':'') : '') + log.seq.join('');
+    var r = roundsOf(log);
+    var s = (r>0 ? '✅×'+r+(log.seq.length?'  ':'') : '') + log.seq.join('');
     document.getElementById('log').textContent = s || '记录';
   }
   function fmt(s){ var m=Math.floor(s/60), r=s%60; return (m<10?'0':'')+m+':'+(r<10?'0':'')+r }
@@ -208,8 +290,8 @@
     stop(); beep(); checkDay();
     log.seq.push(MODES[mode].icon);
     if(mode==='focus') log.f=(log.f||0)+1; else if(mode==='short') log.s=(log.s||0)+1; else log.l=(log.l||0)+1;
-    if(mode==='long'){                       // 长休结束 = 一轮完整番茄钟
-      log.rounds++; log.seq=[]; save();
+    if(mode==='long'){                       // 长休结束 → 开始新的一轮
+      log.seq=[]; save();
       setMode('focus');
     }else if(mode==='focus'){
       var n = log.seq.filter(function(i){return i==='🍅'}).length;
@@ -272,9 +354,9 @@
   function renderHist(){
     var days = Object.keys(store).sort().reverse(), h='';
     for(var i=0;i<days.length;i++){
-      var d = store[days[i]];
-      if(!(d.f||d.rounds||(d.seq&&d.seq.length))) continue;
-      h += '<div>'+days[i].slice(5).replace('-','/')+'&nbsp; 🍅×'+(d.f||0)+(d.rounds?'&nbsp;✅×'+d.rounds:'')+'</div>';
+      var d = store[days[i]], r = roundsOf(d);
+      if(!(d.f||(d.seq&&d.seq.length))) continue;
+      h += '<div>'+days[i].slice(5).replace('-','/')+'&nbsp; 🍅×'+(d.f||0)+(r?'&nbsp;✅×'+r:'')+'</div>';
     }
     histEl.innerHTML = h || '<div>暂无记录</div>';
   }
@@ -293,6 +375,7 @@
   window.addEventListener('resize', fit);
   fit();
   render();
+  pull();
 })();
 </script>
 </body>
