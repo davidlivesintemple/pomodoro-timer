@@ -28,7 +28,7 @@
   .tabs button.on{ background:var(--bg); color:var(--fg); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12) }
   /* 本轮循环进度:25-5-25-5-25-5-25-20 */
   .strip{ display:flex; gap:7px; justify-content:center; margin-bottom:16px; font-size:15px; line-height:1.6 }
-  .strip i{ font-style:normal; opacity:.2; transition:all .2s; position:relative }
+  .strip i{ font-style:normal; opacity:.2; transition:all .2s; position:relative; cursor:pointer }
   .strip i.done{ opacity:1 }
   .strip i.cur{ opacity:1; transform:scale(1.3) }
   .strip i.cur::after{
@@ -78,7 +78,7 @@
     <button id="t-short">☕ 短休</button>
     <button id="t-long">🛋 长休</button>
   </div>
-  <div class="strip" id="strip" title="本轮进度:25-5-25-5-25-5-25-20"></div>
+  <div class="strip" id="strip" title="本轮进度:25-5-25-5-25-5-25-20,点击可设置当前位置"></div>
   <div class="ring">
     <svg width="230" height="230" viewBox="0 0 230 230">
       <circle class="track" cx="115" cy="115" r="106"></circle>
@@ -131,13 +131,29 @@
     if(curDay!==today()){ curDay=today(); log = store[curDay] = store[curDay] || blank(); save() }
   }
 
+  function cnt(a,c){ return a.filter(function(x){return x===c}).length }
+  // 点击进度条某一格 → 把本轮位置设到那里(它之前的算已完成,计入今日记录)
+  function setPos(i){
+    checkDay();
+    var oF=cnt(log.seq,'🍅'), oS=cnt(log.seq,'☕'), oL=cnt(log.seq,'🛋');
+    var ns=[]; for(var j=0;j<i;j++) ns.push(MODES[SEQ[j]].icon);
+    log.seq=ns;
+    log.f=(log.f||0)-oF+cnt(ns,'🍅');
+    log.s=(log.s||0)-oS+cnt(ns,'☕');
+    log.l=(log.l||0)-oL+cnt(ns,'🛋');
+    save();
+    setMode(SEQ[i]);
+  }
   function renderStrip(){
     var pos = Math.min(log.seq.length, SEQ.length-1);
-    var h='';
+    var el = document.getElementById('strip'), h='';
     for(var i=0;i<SEQ.length;i++){
       h += '<i class="'+(i<log.seq.length?'done':(i===pos?'cur':''))+'">'+MODES[SEQ[i]].icon+'</i>';
     }
-    document.getElementById('strip').innerHTML = h;
+    el.innerHTML = h;
+    for(var i=0;i<el.children.length;i++){
+      el.children[i].onclick = (function(idx){ return function(){ setPos(idx) } })(i);
+    }
   }
   function renderLog(){
     var s = (log.rounds>0 ? '✅×'+log.rounds+(log.seq.length?'  ':'') : '') + log.seq.join('');
