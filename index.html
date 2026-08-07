@@ -366,11 +366,11 @@
     histEl.style.display = histEl.style.display==='block' ? 'none' : 'block';
   };
   document.addEventListener('click', function(){ histEl.style.display='none' });
-  // 窗口太矮/太窄时整体等比缩小,保证完整显示
+  // 整体等比缩放:窗口小就缩,窗口大就放大填满,最大 2 倍
   var card=document.querySelector('.card');
   function fit(){
-    var s=Math.min(1, window.innerHeight/470, window.innerWidth/320);
-    card.style.transform='scale('+s+')';
+    var s=Math.min(window.innerHeight/460, window.innerWidth/330);
+    card.style.transform='scale('+Math.max(0.5, Math.min(2, s))+')';
   }
   window.addEventListener('resize', fit);
   fit();
