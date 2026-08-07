@@ -355,8 +355,13 @@
     var days = Object.keys(store).sort().reverse(), h='';
     for(var i=0;i<days.length;i++){
       var d = store[days[i]], r = roundsOf(d);
-      if(!(d.f||(d.seq&&d.seq.length))) continue;
-      h += '<div>'+days[i].slice(5).replace('-','/')+'&nbsp; 🍅×'+(d.f||0)+(r?'&nbsp;✅×'+r:'')+'</div>';
+      if(!(d.f||d.s||d.l||(d.seq&&d.seq.length))) continue;
+      h += '<div>'+days[i].slice(5).replace('-','/')
+         + '&nbsp; 🍅×'+(d.f||0)
+         + (d.s ? '&nbsp; ☕×'+d.s : '')
+         + (d.l ? '&nbsp; 🛋×'+d.l : '')
+         + (r ? '&nbsp; ✅×'+r : '')
+         + '</div>';
     }
     histEl.innerHTML = h || '<div>暂无记录</div>';
   }
