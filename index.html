@@ -26,6 +26,12 @@
     padding:5px 14px; border-radius:999px; cursor:pointer; font-family:inherit;
   }
   .tabs button.on{ background:var(--bg); color:var(--fg); font-weight:600; box-shadow:0 1px 3px rgba(0,0,0,.12) }
+  /* 循环之外的额外时段,单独一排放在循环上方,不占循环的位置 */
+  .extra{
+    display:flex; gap:5px; justify-content:center; min-height:14px;
+    margin-bottom:4px; font-size:11px; line-height:1.2; opacity:.45;
+  }
+  .extra i{ font-style:normal }
   /* 本轮循环进度:25-5-25-5-25-5-25-20 */
   .strip{ display:flex; gap:7px; justify-content:center; margin-bottom:16px; font-size:15px; line-height:1.6 }
   .strip i{ font-style:normal; opacity:.2; transition:all .2s; position:relative; cursor:pointer }
@@ -94,6 +100,7 @@
     <button id="t-long">🛋 长休</button>
     <button id="t-free">⏳ 自由</button>
   </div>
+  <div class="extra" id="extra" title="循环之外额外完成的时段"></div>
   <div class="strip" id="strip" title="本轮进度:25-5-25-5-25-5-25-20,点击可设置当前位置"></div>
   <div class="ring">
     <svg width="230" height="230" viewBox="0 0 230 230">
@@ -133,7 +140,7 @@
   // 每日记录,按北京时间(UTC+8)零点切换新的一天,历史保存 365 天
   function today(){ return new Date(Date.now()+8*3600e3).toISOString().slice(0,10) }
   var store={}, log, curDay=today();
-  function blank(){ return {seq:[], rounds:0, f:0, s:0, l:0, x:0, u:0} }
+  function blank(){ return {seq:[], ex:[], rounds:0, f:0, s:0, l:0, x:0, u:0} }
   (function(){
     try{ store = JSON.parse(localStorage.getItem('pomo-hist')) || {} }catch(e){ store={} }
     try{ // 迁移旧的单日格式
@@ -304,6 +311,11 @@
     save();
     setMode(SEQ[i]);
   }
+  function renderExtra(){
+    var ex = log.ex || [], h='';
+    for(var i=0;i<ex.length;i++) h += '<i>'+ex[i]+'</i>';
+    document.getElementById('extra').innerHTML = h;
+  }
   function renderStrip(){
     var pos = Math.min(log.seq.length, SEQ.length-1);
     var el = document.getElementById('strip'), h='';
@@ -335,6 +347,7 @@
     document.getElementById('main').textContent = running?'暂停':'开始';
     var tabs={focus:'t-focus',short:'t-short',long:'t-long',free:'t-free'};
     for(var k in tabs) document.getElementById(tabs[k]).className = (k===mode?'on':'');
+    renderExtra();
     renderStrip();
     renderLog();
   }
@@ -356,7 +369,11 @@
   function finish(){
     stop(); beep(); checkDay();
     if(mode==='free'){                       // 自由计时只计数,不动 25-5 的循环
-      log.x=(log.x||0)+1; save();
+      log.x=(log.x||0)+1;
+      if(!log.ex) log.ex = [];
+      log.ex.push(MODES.free.icon);
+      if(log.ex.length > 20) log.ex.shift();
+      save();
       setMode('free');
       return;
     }
@@ -364,8 +381,14 @@
     if(mode==='focus') log.f=(log.f||0)+1; else if(mode==='short') log.s=(log.s||0)+1; else log.l=(log.l||0)+1;
 
     // 只有走在循环上的那一步才推进进度条。
-    // 额外插进来的休息(比如运动完回来先歇 5 分钟)只计总数,不打乱循环位置。
-    if(SEQ[log.seq.length] === mode) log.seq.push(MODES[mode].icon);
+    // 额外插进来的时段(比如运动完回来先歇 5 分钟)另放一排,不打乱循环节奏。
+    if(SEQ[log.seq.length] === mode){
+      log.seq.push(MODES[mode].icon);
+    }else{
+      if(!log.ex) log.ex = [];
+      log.ex.push(MODES[mode].icon);
+      if(log.ex.length > 20) log.ex.shift();
+    }
 
     if(log.seq.length >= SEQ.length) log.seq = [];   // 一整轮走完,重新开始
     save();
