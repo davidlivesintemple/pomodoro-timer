@@ -104,15 +104,14 @@
        transition:transform .3s cubic-bezier(.2,.7,.3,1) }
   #jar.init .it{ transition:none }
   .it u,.it b{ display:block; width:100%; height:100%; font-style:normal }
-  .it svg{ display:block; width:100%; height:100%; transform-origin:50% 100% }
-  .it svg .a{ fill:var(--c) }
-  .it svg .b{ fill:none; stroke:var(--bg); stroke-width:2.4; stroke-linejoin:round; stroke-linecap:round }
-  .it svg .c{ fill:var(--bg) }
-  .it[data-k=f]{ --c:var(--focus) }  .it[data-k=s]{ --c:var(--break) }
-  .it[data-k=l]{ --c:var(--long) }   .it[data-k=x]{ --c:var(--free) }
-  .it.drop u  { animation:jy var(--t) both }
-  .it.drop b  { animation:jx var(--t) both }
-  .it.drop svg{ animation:jq var(--t) both }
+  .it s{                                            /* 装 emoji 的那一层 */
+    display:flex; align-items:center; justify-content:center;
+    width:100%; height:100%; text-decoration:none;
+    font-size:calc(var(--d) * 0.95); line-height:1; transform-origin:50% 100%;
+  }
+  .it.drop u{ animation:jy var(--t) both }
+  .it.drop b{ animation:jx var(--t) both }
+  .it.drop s{ animation:jq var(--t) both }
   @keyframes jy{                                   /* 掉下来 + 弹两下 */
     0%  { transform:translateY(var(--dy)); animation-timing-function:cubic-bezier(.4,0,.85,.5) }
     58% { transform:translateY(0);         animation-timing-function:cubic-bezier(.05,.7,.3,1) }
@@ -146,25 +145,6 @@
 </style>
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <symbol id="jf" viewBox="0 0 32 32"><!-- 番茄 -->
-    <circle class="a" cx="16" cy="17" r="14"/>
-    <path class="b" d="M16 4.5c-2.4-2-5-1.3-5-1.3S11.7 5.8 14 6.4M16 4.5c2.4-2 5-1.3 5-1.3S20.3 5.8 18 6.4"/>
-  </symbol>
-  <symbol id="js" viewBox="0 0 32 32"><!-- 咖啡杯 -->
-    <circle class="a" cx="16" cy="16" r="15"/>
-    <path class="b" d="M9.5 11h11.5v6.2a5.75 5.75 0 0 1-11.5 0z"/>
-    <path class="b" d="M21 12.6h1.9a2.7 2.7 0 0 1 0 5.4H21"/>
-  </symbol>
-  <symbol id="jl" viewBox="0 0 32 32"><!-- 长休:月亮 -->
-    <circle class="a" cx="16" cy="16" r="15"/>
-    <path class="c" d="M20.8 8.6A7.8 7.8 0 1 0 22.4 21.6a8.9 8.9 0 0 1-1.6-13z"/>
-  </symbol>
-  <symbol id="jx" viewBox="0 0 32 32"><!-- 自由:沙漏 -->
-    <circle class="a" cx="16" cy="16" r="15"/>
-    <path class="b" d="M10.5 8.5h11l-5.5 7.5 5.5 7.5h-11l5.5-7.5z"/>
-  </symbol>
-</defs></svg>
 <div class="bottle" id="bottle"></div>
 <div id="jar"></div>
 <div class="card">
@@ -371,7 +351,7 @@
   // 全靠 CSS 动画,静止时不跑任何循环,手机不发烫。
   var Jar = (function(){
     var jarEl, bottleEl, shown = '', box = null;
-    var KINDS = { f:'#jf', s:'#js', l:'#jl', x:'#jx' };
+    var KINDS = { f:'🍅', s:'☕', l:'🛋', x:'⏳' };
     var SIZE  = { f:1.00, s:0.66, l:0.86, x:0.74 };   // 25 分钟本来就比 5 分钟"重"
     var CAP = 40;
 
@@ -416,15 +396,15 @@
       var vw = window.innerWidth, vh = window.innerHeight;
       var card = document.querySelector('.card');
       var cw = card ? card.getBoundingClientRect().width : 320;
-      var W = Math.max(260, Math.min(vw - 14, cw + 56));
+      var W = Math.max(280, Math.min(vw - 12, Math.max(cw + 130, vw*0.56)));
       var H = Math.max(120, vh - 8);
-      var pad = 10;
+      var pad = 12;
       box = {
         left: Math.round((vw - W)/2), top: 4, W: W, H: H,
         iw: W - pad*2, pad: pad,
         floor: 4 + H - 3                       // 瓶底内沿(距视口顶部)
       };
-      box.d = Math.max(17, Math.min(34, Math.round(box.iw/13)));
+      box.d = Math.max(22, Math.min(56, Math.round(box.iw/15)));
       bottleEl.style.left = box.left+'px';
       bottleEl.style.top = box.top+'px';
       bottleEl.style.width = W+'px';
@@ -489,7 +469,7 @@
       e.style.setProperty('--d', it.d+'px');
       e.style.setProperty('--x', it.x+'px');
       e.style.setProperty('--y', it.y+'px');
-      e.innerHTML = '<u><b><svg viewBox="0 0 32 32"><use href="'+KINDS[it.k]+'"/></svg></b></u>';
+      e.innerHTML = '<u><b><s>'+KINDS[it.k]+'</s></b></u>';
       return e;
     }
     function animate(e, it){
@@ -518,7 +498,7 @@
         if(i < kids.length){
           e = kids[i];
           e.setAttribute('data-k', items[i].k);
-          e.querySelector('use').setAttribute('href', KINDS[items[i].k]);
+          e.querySelector('s').textContent = KINDS[items[i].k];
         }else{
           e = el(items[i]);
           jarEl.appendChild(e);
