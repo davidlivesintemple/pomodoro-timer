@@ -56,6 +56,7 @@
   }
   .time b{ font-size:52px; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:1px; cursor:pointer }
   .time span{ font-size:13px; color:var(--muted); margin-top:2px }
+  .time span.armed{ cursor:pointer; text-decoration:underline; text-underline-offset:3px }
   #clock-in{
     font-family:inherit; font-size:52px; font-weight:600; font-variant-numeric:tabular-nums;
     letter-spacing:1px; width:186px; text-align:center; background:var(--track); color:var(--fg);
@@ -166,10 +167,11 @@
     // 自由计时:时长由你定,点圆圈里的时间改。它不参与 25-5 的循环。
     free :{sec:15*60, label:'自由计时 · 点时间改', color:'var(--free)', icon:'⏳'}
   };
-  try{
-    var fs0 = +localStorage.getItem('pomo-free');
-    if(fs0 > 0) MODES.free.sec = fs0;
-  }catch(e){}
+  // 各时段时长可以改;改过就一直用,并跟着云端同步到另一台设备
+  function applyCfg(c){
+    if(!c) return;
+    for(var k in MODES) if(c[k] > 0 && c[k] <= 99*60+59) MODES[k].sec = c[k];
+  }
   var SEQ = ['focus','short','focus','short','focus','short','focus','long'];
   var C = 2*Math.PI*106;
   var bar = document.getElementById('bar');
@@ -192,6 +194,15 @@
       }
       localStorage.removeItem('pomo-log');
     }catch(e){}
+    try{                                     // 迁移旧的"自由时长"单项设置
+      var fs0 = +localStorage.getItem('pomo-free');
+      if(fs0 > 0){
+        store._cfg = store._cfg || { u: Date.now() };
+        if(!(store._cfg.free > 0)) store._cfg.free = fs0;
+        localStorage.removeItem('pomo-free');
+      }
+    }catch(e){}
+    applyCfg(store._cfg);
     prune();
     log = useDay(curDay);
   })();
@@ -266,7 +277,7 @@
 
   // 逐日取较新的一份;某天只存在于一边就直接保留
   function merge(remote){
-    var changed = false, runChanged = false;
+    var changed = false, runChanged = false, cfgChanged = false;
     for(var d in remote){
       var r = remote[d];
       if(!r || typeof r!=='object') continue;
@@ -274,11 +285,15 @@
         if(!store._run || (r.u||0) > (store._run.u||0)){ store._run = r; runChanged = true; }
         continue;
       }
+      if(d === '_cfg'){                          // 各时段的时长设置,两台设备共用
+        if(!store._cfg || (r.u||0) > (store._cfg.u||0)){ store._cfg = r; applyCfg(r); cfgChanged = true; }
+        continue;
+      }
       if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
       var l = store[d];
       if(!l || (r.u||0) > (l.u||0)){ store[d] = r; changed = true; }
     }
-    return { changed: changed, runChanged: runChanged };
+    return { changed: changed, runChanged: runChanged, cfgChanged: cfgChanged };
   }
 
   var pushT=null, pushing=false, pushAgain=false;
@@ -314,6 +329,7 @@
         log = useDay(curDay);
         persistLocal();
         setDot('ok');
+        if(res.cfgChanged && !running) remaining = MODES[mode].sec;   // 时长改了,没在跑就跟上
         render();
         if(res.runChanged) applyRun(store._run);   // 接上另一台/上次没跑完的计时
         if(res.changed) push();   // 把合并结果写回,让两端一致
@@ -543,6 +559,23 @@
     flashT=setTimeout(function(){ flashMsg=null; render() }, 2500);
     render();
   }
+  // 改完时间后,提示语变成"设为默认"可点一下 —— 不点就只是这一次有效
+  var armSec=0, armMode='', armT=null;
+  function arm(){
+    armSec = remaining; armMode = mode;
+    clearTimeout(armT);
+    armT = setTimeout(disarm, 7000);
+    render();
+  }
+  function disarm(){ if(!armSec) return; armSec=0; clearTimeout(armT); render() }
+  function setCfg(m, sec){
+    store._cfg = store._cfg || {};
+    store._cfg[m] = sec;
+    store._cfg.u = Date.now();
+    applyCfg(store._cfg);
+    persistLocal();
+    schedulePush();
+  }
   function guard(key, fn){
     if(!running){ fn(); return }
     var now=Date.now();
@@ -593,8 +626,10 @@
   function render(){
     if(!editing) clockEl.textContent = fmt(remaining);
     var hintEl = document.getElementById('hint');
-    hintEl.textContent = flashMsg || MODES[mode].label;
-    hintEl.style.color = flashMsg ? 'var(--accent,var(--focus))' : '';
+    var armed = armSec > 0 && !flashMsg;
+    hintEl.textContent = flashMsg || (armed ? MODES[mode].label+' · 设为默认' : MODES[mode].label);
+    hintEl.className = armed ? 'armed' : '';
+    hintEl.style.color = (flashMsg || armed) ? 'var(--accent,var(--focus))' : '';
     document.documentElement.style.setProperty('--accent', MODES[mode].color);
     bar.style.stroke = MODES[mode].color;
     bar.style.strokeDashoffset = C*(1-Math.min(1, remaining/MODES[mode].sec));
@@ -620,7 +655,7 @@
     }catch(e){}
   }
   function stop(){ running=false; if(timer){clearInterval(timer); timer=null} }
-  function setMode(m){ stop(); mode=m; remaining=MODES[m].sec; render(); saveRun() }
+  function setMode(m){ disarm(); stop(); mode=m; remaining=MODES[m].sec; render(); saveRun() }
   function finish(){
     stop(); beep(); checkDay();
     if(mode==='free'){                       // 自由计时只计数,不动 25-5 的循环
@@ -678,10 +713,8 @@
           var s=(+m[1])*60+(+(m[2]||0));
           if(s>0){
             remaining=Math.min(s,99*60+59);
-            if(mode==='free'){            // 自由模式下把新时长记住,下次直接用
-              MODES.free.sec = remaining;
-              try{ localStorage.setItem('pomo-free', remaining) }catch(e2){}
-            }
+            if(mode==='free') setCfg('free', remaining);   // 自由模式本来就是"自定时长",直接记住
+            else arm();                                    // 其余先只用这一次,想长期用就点"设为默认"
           }
         }
         else if(v) flash('时间格式如 12:30');
@@ -694,6 +727,12 @@
       if(e.key==='Enter') done(true); else if(e.key==='Escape') done(false);
     };
     inp.onblur=function(){ done(true) };
+  };
+  document.getElementById('hint').onclick = function(){
+    if(!(armSec > 0)) return;
+    setCfg(armMode, armSec);
+    var m = armMode; armSec = 0; clearTimeout(armT);
+    flash('以后 '+MODES[m].label.replace(/ .*/,'')+' 都是 '+fmt(MODES[m].sec));
   };
   function startTimer(){ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); saveRun() }
   document.getElementById('main').onclick = function(){
