@@ -9,14 +9,8 @@
     --bg:#ffffff; --fg:#37352f; --muted:#9b9a97; --track:#eeedeb;
     --focus:#e5484d; --break:#2f9e6e; --long:#3a7bd5; --free:#8b5cf6;
   }
-  :root{
-    --glass:rgba(0,0,0,.13); --glass-fill:rgba(0,0,0,.018); --glass-hi:rgba(255,255,255,.6);
-  }
   @media (prefers-color-scheme: dark){
-    :root{
-      --bg:#191919; --fg:#e8e8e6; --muted:#8a8a86; --track:#2e2e2e;
-      --glass:rgba(255,255,255,.15); --glass-fill:rgba(255,255,255,.03); --glass-hi:rgba(255,255,255,.1);
-    }
+    :root{ --bg:#191919; --fg:#e8e8e6; --muted:#8a8a86; --track:#2e2e2e; }
   }
   *{box-sizing:border-box; margin:0; padding:0}
   html,body{height:100%}
@@ -25,17 +19,8 @@
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;
     display:flex; align-items:center; justify-content:center; overflow:hidden;
   }
-  /* 整个番茄钟就是一只瓶子:界面在瓶子里,完成的时段掉进来沉在瓶底 */
-  .bottle{
-    position:fixed; pointer-events:none; z-index:0;
-    border:1.5px solid var(--glass); border-top:0;
-    border-radius:3px 3px 22px 22px / 3px 3px 30px 30px;
-    background:var(--glass-fill);
-  }
-  .bottle::after{                       /* 瓶壁高光 */
-    content:''; position:absolute; left:9%; top:6%; width:2px; height:46%;
-    border-radius:2px; background:var(--glass-hi); opacity:.5;
-  }
+  /* 整个番茄钟就是一只瓶子:瓶身不画出来,只用它定边界,东西掉进来沉在底部 */
+  .bottle{ position:fixed; pointer-events:none; z-index:0 }
   .bottle.thud{ animation:thud .16s }
   @keyframes thud{ 0%{transform:translateY(0)} 35%{transform:translateY(2px)} 100%{transform:translateY(0)} }
   #jar{ position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden }
@@ -104,15 +89,15 @@
        transform:translate3d(var(--x),var(--y),0);
        transition:transform .3s cubic-bezier(.2,.7,.3,1) }
   #jar.init .it{ transition:none }
-  .it u,.it b{ display:block; width:100%; height:100%; font-style:normal }
-  .it span{                                         /* 装 emoji 的那一层 */
+  .it .dy,.it .dx{ display:block; width:100%; height:100% }
+  .it .em{                                          /* 装 emoji 的那一层 */
     display:flex; align-items:center; justify-content:center;
     width:100%; height:100%; text-decoration:none;
     font-size:calc(var(--d) * 0.95); line-height:1; transform-origin:50% 100%;
   }
-  .it.drop u   { animation:jy var(--t) both }
-  .it.drop b   { animation:jx var(--t) both }
-  .it.drop span{ animation:jq var(--t) both }
+  .it.drop .dy{ animation:jy var(--t) both }
+  .it.drop .dx{ animation:jx var(--t) both }
+  .it.drop .em{ animation:jq var(--t) both }
   @keyframes jy{                                   /* 掉下来 + 弹两下 */
     0%  { transform:translateY(var(--dy)); animation-timing-function:cubic-bezier(.4,0,.85,.5) }
     58% { transform:translateY(0);         animation-timing-function:cubic-bezier(.05,.7,.3,1) }
@@ -476,7 +461,7 @@
       e.style.setProperty('--d', it.d+'px');
       e.style.setProperty('--x', it.x+'px');
       e.style.setProperty('--y', it.y+'px');
-      e.innerHTML = '<u><b><span>'+KINDS[it.k]+'</span></b></u>';
+      e.innerHTML = '<div class="dy"><div class="dx"><div class="em">'+KINDS[it.k]+'</div></div></div>';
       return e;
     }
     function animate(e, it){
@@ -505,7 +490,7 @@
         if(i < kids.length){
           e = kids[i];
           e.setAttribute('data-k', items[i].k);
-          e.querySelector('span').textContent = KINDS[items[i].k];
+          e.querySelector('.em').textContent = KINDS[items[i].k];
         }else{
           e = el(items[i]);
           jarEl.appendChild(e);
