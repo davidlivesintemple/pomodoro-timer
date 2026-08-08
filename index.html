@@ -7,7 +7,7 @@
 <style>
   :root{
     --bg:#ffffff; --fg:#37352f; --muted:#9b9a97; --track:#eeedeb;
-    --focus:#e5484d; --break:#2f9e6e; --long:#3a7bd5;
+    --focus:#e5484d; --break:#2f9e6e; --long:#3a7bd5; --free:#8b5cf6;
   }
   @media (prefers-color-scheme: dark){
     :root{ --bg:#191919; --fg:#e8e8e6; --muted:#8a8a86; --track:#2e2e2e; }
@@ -92,6 +92,7 @@
     <button id="t-focus" class="on">🍅 专注</button>
     <button id="t-short">☕ 短休</button>
     <button id="t-long">🛋 长休</button>
+    <button id="t-free">⏳ 自由</button>
   </div>
   <div class="strip" id="strip" title="本轮进度:25-5-25-5-25-5-25-20,点击可设置当前位置"></div>
   <div class="ring">
@@ -114,8 +115,14 @@
   var MODES = {
     focus:{sec:25*60, label:'保持专注', color:'var(--focus)', icon:'🍅'},
     short:{sec: 5*60, label:'休息一下', color:'var(--break)', icon:'☕'},
-    long :{sec:20*60, label:'好好休息', color:'var(--long)', icon:'🛋'}
+    long :{sec:20*60, label:'好好休息', color:'var(--long)', icon:'🛋'},
+    // 自由计时:时长由你定,点圆圈里的时间改。它不参与 25-5 的循环。
+    free :{sec:15*60, label:'自由计时 · 点时间改', color:'var(--free)', icon:'⏳'}
   };
+  try{
+    var fs0 = +localStorage.getItem('pomo-free');
+    if(fs0 > 0) MODES.free.sec = fs0;
+  }catch(e){}
   var SEQ = ['focus','short','focus','short','focus','short','focus','long'];
   var C = 2*Math.PI*106;
   var bar = document.getElementById('bar');
@@ -126,7 +133,7 @@
   // 每日记录,按北京时间(UTC+8)零点切换新的一天,历史保存 365 天
   function today(){ return new Date(Date.now()+8*3600e3).toISOString().slice(0,10) }
   var store={}, log, curDay=today();
-  function blank(){ return {seq:[], rounds:0, f:0, s:0, l:0, u:0} }
+  function blank(){ return {seq:[], rounds:0, f:0, s:0, l:0, x:0, u:0} }
   (function(){
     try{ store = JSON.parse(localStorage.getItem('pomo-hist')) || {} }catch(e){ store={} }
     try{ // 迁移旧的单日格式
@@ -264,7 +271,8 @@
   function roundsOf(d){ return Math.floor((d.f||0)/4) }
   function renderLog(){
     var r = roundsOf(log);
-    var s = (r>0 ? '✅×'+r+(log.seq.length?'  ':'') : '') + log.seq.join('');
+    var s = (r>0 ? '✅×'+r+(log.seq.length?'  ':'') : '') + log.seq.join('')
+          + (log.x ? '  ⏳×'+log.x : '');
     document.getElementById('log').textContent = s || '记录';
   }
   function fmt(s){ var m=Math.floor(s/60), r=s%60; return (m<10?'0':'')+m+':'+(r<10?'0':'')+r }
@@ -277,7 +285,7 @@
     bar.style.stroke = MODES[mode].color;
     bar.style.strokeDashoffset = C*(1-Math.min(1, remaining/MODES[mode].sec));
     document.getElementById('main').textContent = running?'暂停':'开始';
-    var tabs={focus:'t-focus',short:'t-short',long:'t-long'};
+    var tabs={focus:'t-focus',short:'t-short',long:'t-long',free:'t-free'};
     for(var k in tabs) document.getElementById(tabs[k]).className = (k===mode?'on':'');
     renderStrip();
     renderLog();
@@ -299,6 +307,11 @@
   function setMode(m){ stop(); mode=m; remaining=MODES[m].sec; render() }
   function finish(){
     stop(); beep(); checkDay();
+    if(mode==='free'){                       // 自由计时只计数,不动 25-5 的循环
+      log.x=(log.x||0)+1; save();
+      setMode('free');
+      return;
+    }
     log.seq.push(MODES[mode].icon);
     if(mode==='focus') log.f=(log.f||0)+1; else if(mode==='short') log.s=(log.s||0)+1; else log.l=(log.l||0)+1;
     if(mode==='long'){                       // 长休结束 → 开始新的一轮
@@ -336,7 +349,16 @@
           .replace(/[０-９]/g, function(c){ return String.fromCharCode(c.charCodeAt(0)-0xFEE0) })
           .replace(/[：，。．]/g, ':');
         var m = v.match(/^(\d{1,3})(?::([0-5]?\d))?$/);
-        if(m){ var s=(+m[1])*60+(+(m[2]||0)); if(s>0) remaining=Math.min(s,99*60+59); }
+        if(m){
+          var s=(+m[1])*60+(+(m[2]||0));
+          if(s>0){
+            remaining=Math.min(s,99*60+59);
+            if(mode==='free'){            // 自由模式下把新时长记住,下次直接用
+              MODES.free.sec = remaining;
+              try{ localStorage.setItem('pomo-free', remaining) }catch(e2){}
+            }
+          }
+        }
         else if(v) flash('时间格式如 12:30');
       }
       render();
@@ -360,17 +382,19 @@
   document.getElementById('t-focus').onclick=function(){ guard('focus', function(){ setMode('focus') }) };
   document.getElementById('t-short').onclick=function(){ guard('short', function(){ setMode('short') }) };
   document.getElementById('t-long').onclick=function(){ guard('long', function(){ setMode('long') }) };
+  document.getElementById('t-free').onclick=function(){ guard('free', function(){ setMode('free') }) };
   // 点击右下角记录 → 查看一年内每日历史
   var histEl = document.getElementById('hist');
   function renderHist(){
     var days = Object.keys(store).sort().reverse(), h='';
     for(var i=0;i<days.length;i++){
       var k = days[i], d = store[k], r = roundsOf(d);
-      if(d.del || !(d.f||d.s||d.l||(d.seq&&d.seq.length))) continue;
+      if(d.del || !(d.f||d.s||d.l||d.x||(d.seq&&d.seq.length))) continue;
       h += '<div class="row" data-d="'+k+'">'+k.slice(5).replace('-','/')
          + '&nbsp; 🍅×'+(d.f||0)
          + (d.s ? '&nbsp; ☕×'+d.s : '')
          + (d.l ? '&nbsp; 🛋×'+d.l : '')
+         + (d.x ? '&nbsp; ⏳×'+d.x : '')
          + (r ? '&nbsp; ✅×'+r : '')
          + '<b class="x" title="删除这一天">×</b></div>';
     }
