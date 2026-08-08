@@ -746,9 +746,16 @@
     if(running){ stop(); render(); saveRun() }
     else{ startTimer(); }
   };
-  // 任意时刻按回车开始倒计时(编辑时间时除外)
+  // 回车和空格都是"开始 / 暂停"反复切换
+  // (编辑时间时除外,那次回车只用来确认时间;焦点在按钮上时交给按钮,免得按两次)
   document.addEventListener('keydown', function(e){
-    if(!editing && e.key==='Enter' && !running && remaining>0) startTimer();
+    if(editing) return;
+    var k = e.key;
+    if(k!=='Enter' && k!==' ' && k!=='Spacebar') return;
+    if(e.target && e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    if(running){ stop(); render(); saveRun() }
+    else if(remaining>0) startTimer();
   });
   document.getElementById('reset').onclick = function(){ guard('reset', function(){ setMode(mode) }) };
   document.getElementById('t-focus').onclick=function(){ guard('focus', function(){ setMode('focus') }) };
