@@ -86,13 +86,14 @@
   }
   #main:active{ transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,.18) }
   #reset{ width:64px; border:1.5px solid var(--track); background:transparent; color:var(--muted) }
+  /* 同步点和今日小结贴在瓶肩上,不占瓶底(瓶底是给东西堆的) */
   #log{
-    position:fixed; right:10px; bottom:8px; font-size:11px; line-height:1.4;
-    color:var(--muted); opacity:.55; letter-spacing:1px; text-align:right; cursor:pointer;
-    min-width:24px; min-height:14px;
+    position:fixed; font-size:11px; line-height:1.4; z-index:2;
+    color:var(--muted); opacity:.6; letter-spacing:.5px; text-align:right; cursor:pointer;
+    min-width:24px; min-height:14px; white-space:nowrap;
   }
   #dot{
-    position:fixed; left:10px; bottom:11px; width:7px; height:7px; border-radius:50%;
+    position:fixed; width:7px; height:7px; border-radius:50%; z-index:2;
     background:var(--track); transition:background .3s;
   }
   #dot.ok{ background:var(--break) }
@@ -104,14 +105,14 @@
        transition:transform .3s cubic-bezier(.2,.7,.3,1) }
   #jar.init .it{ transition:none }
   .it u,.it b{ display:block; width:100%; height:100%; font-style:normal }
-  .it s{                                            /* 装 emoji 的那一层 */
+  .it span{                                         /* 装 emoji 的那一层 */
     display:flex; align-items:center; justify-content:center;
     width:100%; height:100%; text-decoration:none;
     font-size:calc(var(--d) * 0.95); line-height:1; transform-origin:50% 100%;
   }
-  .it.drop u{ animation:jy var(--t) both }
-  .it.drop b{ animation:jx var(--t) both }
-  .it.drop s{ animation:jq var(--t) both }
+  .it.drop u   { animation:jy var(--t) both }
+  .it.drop b   { animation:jx var(--t) both }
+  .it.drop span{ animation:jq var(--t) both }
   @keyframes jy{                                   /* 掉下来 + 弹两下 */
     0%  { transform:translateY(var(--dy)); animation-timing-function:cubic-bezier(.4,0,.85,.5) }
     58% { transform:translateY(0);         animation-timing-function:cubic-bezier(.05,.7,.3,1) }
@@ -131,7 +132,7 @@
     .it{ transition:none }
   }
   #hist{
-    display:none; position:fixed; right:8px; bottom:30px; background:var(--bg);
+    display:none; position:fixed; background:var(--bg); z-index:3;
     border:1px solid var(--track); border-radius:8px; padding:8px 12px;
     font-size:12px; line-height:1.7; color:var(--muted); text-align:left;
     max-height:190px; overflow:auto; box-shadow:0 4px 14px rgba(0,0,0,.15); z-index:9;
@@ -409,6 +410,12 @@
       bottleEl.style.top = box.top+'px';
       bottleEl.style.width = W+'px';
       bottleEl.style.height = H+'px';
+      // 同步点和今日小结贴瓶肩(左上/右上),瓶底留给堆积的东西
+      var dot = document.getElementById('dot'), lg = document.getElementById('log'),
+          hs = document.getElementById('hist');
+      if(dot){ dot.style.left = (box.left + box.pad)+'px'; dot.style.top = (box.top + 11)+'px'; }
+      if(lg){ lg.style.right = (vw - box.left - W + box.pad)+'px'; lg.style.top = (box.top + 8)+'px'; }
+      if(hs){ hs.style.right = (vw - box.left - W + box.pad)+'px'; hs.style.top = (box.top + 28)+'px'; }
     }
 
     // 圆落在高度图上:圆心高度 = max(地形高 + √(r²-dx²))
@@ -469,7 +476,7 @@
       e.style.setProperty('--d', it.d+'px');
       e.style.setProperty('--x', it.x+'px');
       e.style.setProperty('--y', it.y+'px');
-      e.innerHTML = '<u><b><s>'+KINDS[it.k]+'</s></b></u>';
+      e.innerHTML = '<u><b><span>'+KINDS[it.k]+'</span></b></u>';
       return e;
     }
     function animate(e, it){
@@ -498,7 +505,7 @@
         if(i < kids.length){
           e = kids[i];
           e.setAttribute('data-k', items[i].k);
-          e.querySelector('s').textContent = KINDS[items[i].k];
+          e.querySelector('span').textContent = KINDS[items[i].k];
         }else{
           e = el(items[i]);
           jarEl.appendChild(e);
@@ -576,11 +583,15 @@
   }
   // 一轮 = 做满 4 个番茄。长休是恢复,没做完不影响这一轮算数。
   function roundsOf(d){ return Math.floor((d.f||0)/4) }
+  // 瓶子和进度条已经把"有哪些"画出来了,这里只留一行今日小结
   function renderLog(){
-    var r = roundsOf(log);
-    var s = (r>0 ? '✅×'+r+(log.seq.length?'  ':'') : '') + log.seq.join('')
-          + (log.x ? '  ⏳×'+log.x : '');
-    document.getElementById('log').textContent = s || '记录';
+    var r = roundsOf(log), p = [];
+    if(log.f) p.push('🍅'+log.f);
+    if(log.s) p.push('☕'+log.s);
+    if(log.l) p.push('🛋'+log.l);
+    if(log.x) p.push('⏳'+log.x);
+    if(r)     p.push('✅'+r);
+    document.getElementById('log').textContent = p.length ? p.join(' ') : '记录';
   }
   function fmt(s){ var m=Math.floor(s/60), r=s%60; return (m<10?'0':'')+m+':'+(r<10?'0':'')+r }
   function render(){
