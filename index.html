@@ -438,7 +438,7 @@
     function solve(o, dayKey){
       if(!box) return [];
       var rnd = rng(hash(dayKey));
-      var res = Math.max(1.5, box.d/12);      // 高度图精度:越细,堆叠越贴合
+      var res = Math.max(1, box.d/24);        // 高度图精度:越细,堆叠越贴合
       var n = Math.ceil(box.iw/res);
       var hmap = new Array(n), i;
       for(i=0;i<n;i++) hmap[i] = 0;
