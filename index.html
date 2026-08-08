@@ -582,15 +582,22 @@
     if(pendKey===key && now-pendAt<3000){ pendKey=null; flashMsg=null; fn(); }
     else{ pendKey=key; pendAt=now; flash('计时中,再点一次确认') }
   }
-  // 点击进度条某一格 → 把本轮位置设到那里(它之前的算已完成,计入今日记录)
+  // 点击进度条某一格 → 把本轮位置挪到那里。
+  // 往前挪会把中间这几段补进今日记录;往回挪只是退回去重做,
+  // 已经完成的事实不会被抹掉 —— 挪一个指针不该删掉你今天真做过的事。
   function setPos(i){
     checkDay();
-    var oF=cnt(log.seq,'🍅'), oS=cnt(log.seq,'☕'), oL=cnt(log.seq,'🛋');
-    var ns=[]; for(var j=0;j<i;j++) ns.push(MODES[SEQ[j]].icon);
-    log.seq=ns;
-    log.f=(log.f||0)-oF+cnt(ns,'🍅');
-    log.s=(log.s||0)-oS+cnt(ns,'☕');
-    log.l=(log.l||0)-oL+cnt(ns,'🛋');
+    var ns=[], j, n;
+    for(j=0;j<i;j++) ns.push(MODES[SEQ[j]].icon);
+    var add = {
+      f: cnt(ns,'🍅') - cnt(log.seq,'🍅'),
+      s: cnt(ns,'☕') - cnt(log.seq,'☕'),
+      l: cnt(ns,'🛋') - cnt(log.seq,'🛋')
+    };
+    for(var k in add){
+      for(n=0; n<add[k]; n++){ log[k] = (log[k]||0) + 1; addOrder(k) }
+    }
+    log.seq = ns;
     save();
     setMode(SEQ[i]);
   }
