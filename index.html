@@ -90,7 +90,8 @@
        transform:translate3d(var(--x),var(--y),0);
        transition:transform .3s cubic-bezier(.2,.7,.3,1) }
   #jar.init .it{ transition:none }
-  .it .dy,.it .dx{ display:block; width:100%; height:100% }
+  .it .dy{ display:block; width:100%; height:100% }
+  .it .dx{ display:block; width:100%; height:100%; transform:rotate(var(--set,0deg)) }
   .it .em{                                          /* 装 emoji 的那一层 */
     display:flex; align-items:center; justify-content:center;
     width:100%; height:100%; text-decoration:none;
@@ -107,10 +108,12 @@
     95% { transform:translateY(calc(-.3*var(--b1))) }
     100%{ transform:translateY(0) }
   }
-  @keyframes jx{                                   /* 落地之后才滚,不是斜着飞 */
+  @keyframes jx{                                   /* 落地之后才滚,最后回到稳定姿态 */
     0%,58%{ transform:translateX(var(--dx)) rotate(0deg);
             animation-timing-function:cubic-bezier(.15,.75,.35,1) }
-    100%  { transform:translateX(0) rotate(var(--rot)) }
+    84%   { transform:translateX(0) rotate(var(--rot));
+            animation-timing-function:cubic-bezier(.35,0,.25,1) }
+    100%  { transform:translateX(0) rotate(var(--set)) }
   }
   @keyframes jq{ 0%,56%{transform:scaleY(1)} 63%{transform:scaleY(.9)} 72%{transform:scaleY(1)} 100%{transform:scaleY(1)} }
   @media (prefers-reduced-motion: reduce){
@@ -460,8 +463,11 @@
           if(cy < bestY){ bestY = cy; bestX = cx; }
         }
         settle(hmap, res, bestX, bestY, r);
+        // 稳定姿态:番茄是圆的,歪一点自然;杯子/沙发/沙漏只有"正着"这一个稳定姿态
+        var q = rnd();
         out.push({
-          k: k, d: d,
+          k: k, d: d, q: q,
+          set: (k === 'f') ? ((q*2-1)*16).toFixed(1) : 0,
           x: box.left + box.pad + bestX - r,
           y: box.floor - bestY - r
         });
@@ -481,10 +487,13 @@
     }
     function animate(e, it){
       var r = it.d/2;
-      var dx = (Math.random()*2-1) * Math.min(70, r*2.6);
+      // 番茄是球,能滚一段;杯子这类只会侧倒一下再晃正,滚不远
+      var far = (it.k === 'f') ? Math.min(80, r*2.8) : Math.min(26, r*0.9);
+      var dx = (it.q*2-1) * far;
       var rot = (-dx)/r * (180/Math.PI) * 0.85;
+      if(it.k !== 'f') rot = Math.max(-42, Math.min(42, rot));
       e.style.setProperty('--dy', (-(it.y + it.d + 40))+'px');
-      e.style.setProperty('--dx', dx+'px');
+      e.style.setProperty('--dx', dx.toFixed(1)+'px');
       e.style.setProperty('--rot', rot.toFixed(1)+'deg');
       e.style.setProperty('--b1', Math.round(r*1.5)+'px');
       e.style.setProperty('--t', '1.05s');
@@ -517,6 +526,7 @@
         e.style.setProperty('--d', items[i].d+'px');
         e.style.setProperty('--x', items[i].x+'px');
         e.style.setProperty('--y', items[i].y+'px');
+        e.style.setProperty('--set', items[i].set+'deg');
       }
       if(window.requestAnimationFrame)
         requestAnimationFrame(function(){ jarEl.classList.remove('init') });
