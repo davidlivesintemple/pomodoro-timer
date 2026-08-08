@@ -336,7 +336,7 @@
   // 位置由"日期种子"确定性算出:同一天刷新多少次,堆出来都一样。
   // 全靠 CSS 动画,静止时不跑任何循环,手机不发烫。
   var Jar = (function(){
-    var jarEl, bottleEl, shown = '', box = null;
+    var jarEl, bottleEl, shown = '', box = null, pile = 0;
     var KINDS = { f:'🍅', s:'☕', l:'🛋', x:'⏳' };
     var SIZE  = { f:1.00, s:0.66, l:0.86, x:0.74 };   // 25 分钟本来就比 5 分钟"重"
     var CAP = 40;
@@ -380,9 +380,8 @@
     function layout(){
       if(!jarEl) return;
       var vw = window.innerWidth, vh = window.innerHeight;
-      var card = document.querySelector('.card');
-      var cw = card ? card.getBoundingClientRect().width : 320;
-      var W = Math.max(280, Math.min(vw - 12, Math.max(cw + 220, vw*0.82)));
+      // 瓶宽只看视口,不看卡片 —— 否则"卡片缩放 → 瓶宽 → 堆高 → 卡片缩放"会来回震荡
+      var W = Math.max(280, Math.min(vw - 12, vw*0.82));
       var H = Math.max(120, vh - 8);
       var pad = 12;
       box = {
@@ -484,6 +483,9 @@
 
     function paint(o, dayKey, fromIdx){
       var items = solve(o, dayKey), kids = jarEl.children, i, e;
+      var top = box ? box.floor : 0;                    // 堆顶,用来给界面让位
+      for(i=0;i<items.length;i++) if(items[i].y < top) top = items[i].y;
+      pile = box ? Math.max(0, box.floor - top) : 0;
       jarEl.classList.add('init');                       // 重排时不滑动
       while(kids.length > items.length) jarEl.removeChild(kids[kids.length-1]);
       for(i=0;i<items.length;i++){
@@ -507,12 +509,19 @@
 
     return {
       _day: '',
+      onpile: null,                         // 堆高变了就通知外面重新给界面让位
+      pileHeight: function(){ return pile },
       mount: function(){
         jarEl = document.getElementById('jar');
         bottleEl = document.getElementById('bottle');
         layout();
       },
-      relayout: function(){ layout(); if(shown) paint(shown, this._day, null) },
+      relayout: function(){
+        layout();
+        var was = pile;
+        if(shown) paint(shown, this._day, null); else pile = 0;
+        if(this.onpile && Math.abs(pile - was) > 2) this.onpile();
+      },
       sync: function(day, dayKey){
         if(!jarEl) return;
         var o = normalize(day || {});
@@ -521,7 +530,9 @@
         var from = (sameDay && o.length > shown.length && o.indexOf(shown) === 0) ? shown.length : null;
         this._day = dayKey;
         shown = o;
+        var was = pile;
         paint(o, dayKey, from);
+        if(this.onpile && Math.abs(pile - was) > 2) this.onpile();
       }
     };
   })();
@@ -736,23 +747,30 @@
   document.addEventListener('click', function(){ histEl.style.display='none' });
   // 整体等比缩放,实测卡片尺寸后填满可视区(留一点边距)
   var card=document.querySelector('.card');
+  // 整体等比缩放,并给瓶底堆积的东西让出位置,免得番茄被按钮压住
   function fit(){
+    var band = Math.min(window.innerHeight*0.4, Jar.pileHeight() + 6);
+    document.body.setAttribute('data-band', Math.round(band));   // 供测试断言
     card.style.transform='none';
     var w=card.offsetWidth, h=card.offsetHeight;
     if(!w || !h) return;
-    var s=Math.min(window.innerWidth*0.92/w, window.innerHeight*0.92/h);
-    card.style.transform='scale('+Math.max(0.4, Math.min(3, s))+')';
+    var availH = Math.max(100, window.innerHeight - band);
+    var s = Math.min(window.innerWidth*0.92/w, availH*0.94/h);
+    s = Math.max(0.4, Math.min(3, s));
+    card.style.transform = 'scale('+s+') translateY('+(-band/2/s).toFixed(2)+'px)';
   }
+  Jar.onpile = fit;
   var fitT=null;
   window.addEventListener('resize', function(){
     fit();
     clearTimeout(fitT);                        // 拖动窗口时不反复重排瓶子
-    fitT = setTimeout(function(){ Jar.relayout() }, 180);
+    fitT = setTimeout(function(){ Jar.relayout(); fit() }, 180);
   });
   Jar.mount();
   fit();
   Jar.relayout();
-  setTimeout(function(){ fit(); Jar.relayout() }, 300);   // 等字体加载完再量一次
+  fit();
+  setTimeout(function(){ Jar.relayout(); fit() }, 300);   // 等字体加载完再量一次
   if(store._run){
     render();
     applyRun(store._run);                // 本机上次没跑完的,先接上
