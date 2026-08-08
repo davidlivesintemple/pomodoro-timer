@@ -360,19 +360,16 @@
       setMode('free');
       return;
     }
-    log.seq.push(MODES[mode].icon);
+    // 总数照记,不管是不是循环里的那一步
     if(mode==='focus') log.f=(log.f||0)+1; else if(mode==='short') log.s=(log.s||0)+1; else log.l=(log.l||0)+1;
-    if(mode==='long'){                       // 长休结束 → 开始新的一轮
-      log.seq=[]; save();
-      setMode('focus');
-    }else if(mode==='focus'){
-      var n = log.seq.filter(function(i){return i==='🍅'}).length;
-      save();
-      setMode(n>=4 ? 'long' : 'short');      // 第 4 个番茄后进入长休
-    }else{
-      save();
-      setMode('focus');
-    }
+
+    // 只有走在循环上的那一步才推进进度条。
+    // 额外插进来的休息(比如运动完回来先歇 5 分钟)只计总数,不打乱循环位置。
+    if(SEQ[log.seq.length] === mode) log.seq.push(MODES[mode].icon);
+
+    if(log.seq.length >= SEQ.length) log.seq = [];   // 一整轮走完,重新开始
+    save();
+    setMode(SEQ[log.seq.length] || 'focus');
   }
   function tick(){
     remaining = Math.max(0, Math.round((endAt-Date.now())/1000));
@@ -480,8 +477,14 @@
   window.addEventListener('resize', fit);
   fit();
   setTimeout(fit, 300);   // 等表情字体加载完再量一次
-  render();
-  if(store._run) applyRun(store._run);   // 本机上次没跑完的,先接上
+  if(store._run){
+    render();
+    applyRun(store._run);                // 本机上次没跑完的,先接上
+  }else{
+    mode = SEQ[log.seq.length] || 'focus';   // 没有计时状态,就按循环走到哪算哪
+    remaining = MODES[mode].sec;
+    render();
+  }
   pull();                                // 再跟云端对一次
 })();
 </script>
