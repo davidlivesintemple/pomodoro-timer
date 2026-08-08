@@ -157,10 +157,52 @@
     var cutoff = new Date(Date.now()+8*3600e3-365*86400e3).toISOString().slice(0,10);
     for(var k in store){ if(k<cutoff) delete store[k] }
   }
+  function persistLocal(){
+    try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){}
+  }
   function save(){
     if(log) log.u = Date.now();
-    try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){}
+    persistLocal();
     schedulePush();
+  }
+
+  // ── 断点续跑 ──────────────────────────────────────────────
+  // 把"现在在哪个模式、几点结束"存下来(本地 + 云端)。
+  // 意外退出后重开,直接从剩下的时间接着跑。
+  var restoring = false;
+  function saveRun(){
+    if(restoring) return;
+    store._run = {
+      mode: mode,
+      endAt: running ? endAt : 0,
+      remaining: remaining,
+      running: running,
+      freeSec: MODES.free.sec,
+      u: Date.now()
+    };
+    persistLocal();
+    schedulePush();
+  }
+  function applyRun(r){
+    if(!r || typeof r!=='object' || !MODES[r.mode]) return;
+    restoring = true;
+    if(r.freeSec > 0) MODES.free.sec = r.freeSec;
+    mode = r.mode;
+    var left = r.running ? Math.round((r.endAt - Date.now())/1000) : (r.remaining|0);
+    if(r.running && left > 0){
+      remaining = left;
+      restoring = false;
+      startTimer();                 // 接着跑,不重头开始
+      return;
+    }
+    if(r.running){                  // 人不在的时候跑完了,不替你计数
+      remaining = 0; running = false;
+      flash('上次计时已结束');
+    }else{
+      remaining = left > 0 ? left : MODES[mode].sec;
+    }
+    restoring = false;
+    render();
   }
   function checkDay(){
     if(curDay!==today()){ curDay=today(); log = useDay(curDay); save() }
@@ -177,14 +219,19 @@
 
   // 逐日取较新的一份;某天只存在于一边就直接保留
   function merge(remote){
-    var changed = false;
+    var changed = false, runChanged = false;
     for(var d in remote){
       var r = remote[d];
-      if(!r || typeof r!=='object' || !/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
+      if(!r || typeof r!=='object') continue;
+      if(d === '_run'){                          // 计时状态也按"谁更新用谁"
+        if(!store._run || (r.u||0) > (store._run.u||0)){ store._run = r; runChanged = true; }
+        continue;
+      }
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
       var l = store[d];
       if(!l || (r.u||0) > (l.u||0)){ store[d] = r; changed = true; }
     }
-    return changed;
+    return { changed: changed, runChanged: runChanged };
   }
 
   var pushT=null, pushing=false, pushAgain=false;
@@ -215,13 +262,14 @@
     fetch(endpoint(), { credentials:'omit', cache:'no-store' })
       .then(function(r){ if(!r.ok) throw 0; return r.json() })
       .then(function(remote){
-        var changed = merge(remote);
+        var res = merge(remote);
         prune();
         log = useDay(curDay);
-        try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e){}
+        persistLocal();
         setDot('ok');
         render();
-        if(changed) push();   // 把合并结果写回,让两端一致
+        if(res.runChanged) applyRun(store._run);   // 接上另一台/上次没跑完的计时
+        if(res.changed) push();   // 把合并结果写回,让两端一致
       })
       .catch(function(){ setDot('err') });
   }
@@ -304,7 +352,7 @@
     }catch(e){}
   }
   function stop(){ running=false; if(timer){clearInterval(timer); timer=null} }
-  function setMode(m){ stop(); mode=m; remaining=MODES[m].sec; render() }
+  function setMode(m){ stop(); mode=m; remaining=MODES[m].sec; render(); saveRun() }
   function finish(){
     stop(); beep(); checkDay();
     if(mode==='free'){                       // 自由计时只计数,不动 25-5 的循环
@@ -362,6 +410,7 @@
         else if(v) flash('时间格式如 12:30');
       }
       render();
+      saveRun();
     }
     inp.onkeydown=function(e){
       e.stopPropagation();   // 确认时间的这次回车不触发"开始"
@@ -369,9 +418,9 @@
     };
     inp.onblur=function(){ done(true) };
   };
-  function startTimer(){ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); }
+  function startTimer(){ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); saveRun() }
   document.getElementById('main').onclick = function(){
-    if(running){ stop(); render(); }
+    if(running){ stop(); render(); saveRun() }
     else{ startTimer(); }
   };
   // 任意时刻按回车开始倒计时(编辑时间时除外)
@@ -432,7 +481,8 @@
   fit();
   setTimeout(fit, 300);   // 等表情字体加载完再量一次
   render();
-  pull();
+  if(store._run) applyRun(store._run);   // 本机上次没跑完的,先接上
+  pull();                                // 再跟云端对一次
 })();
 </script>
 </body>
