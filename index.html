@@ -593,8 +593,8 @@
     else{ pendKey=key; pendAt=now; flash('计时中,再点一次确认') }
   }
   // 点击进度条某一格 → 把本轮位置挪到那里。
-  // 往前挪会把中间这几段补进今日记录;往回挪只是退回去重做,
-  // 已经完成的事实不会被抹掉 —— 挪一个指针不该删掉你今天真做过的事。
+  // 挪指针本身不改记录:往回挪不抹掉做过的,往前挪也不凭空多出没做过的。
+  // 只有往前跳越过没做的格子时,才问一句是"补录"(其实做过)还是"跳过"(没做)。
   function setPos(i){
     checkDay();
     var ns=[], j, n;
@@ -604,8 +604,23 @@
       s: cnt(ns,'☕') - cnt(log.seq,'☕'),
       l: cnt(ns,'🛋') - cnt(log.seq,'🛋')
     };
-    for(var k in add){
-      for(n=0; n<add[k]; n++){ log[k] = (log[k]||0) + 1; addOrder(k) }
+    var skipped = [];
+    if(add.f>0) skipped.push('🍅×'+add.f);
+    if(add.s>0) skipped.push('☕×'+add.s);
+    if(add.l>0) skipped.push('🛋×'+add.l);
+    var backfill = false;
+    if(skipped.length){
+      try{
+        backfill = window.confirm(
+          '中间的 '+skipped.join(' ')+' 其实已经做过了吗?\n\n'+
+          '确定 = 做过,补进今天的记录\n'+
+          '取消 = 没做,只是跳过去,不记录');
+      }catch(e){ backfill = false }   // 弹窗被拦时宁可少记,不凭空多记
+    }
+    if(backfill){
+      for(var k in add){
+        for(n=0; n<add[k]; n++){ log[k] = (log[k]||0) + 1; addOrder(k) }
+      }
     }
     log.seq = ns;
     save();
