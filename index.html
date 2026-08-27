@@ -65,6 +65,10 @@
     box-shadow:inset 0 0 0 2px var(--accent,var(--focus));
   }
   .btns{ display:flex; gap:10px; justify-content:center }
+  /* 只在"轮到休息、还没开始计时"时出现:已经歇过了就直接跳到下一个番茄 */
+  #skip{ display:none; margin-top:12px; font-size:12px; color:var(--muted); cursor:pointer; opacity:.8 }
+  #skip.on{ display:block }
+  #skip:hover{ color:var(--fg) }
   .btns button{ font-family:inherit; font-size:15px; border-radius:10px; cursor:pointer; padding:10px 0 }
   #main{
     width:150px; border:0; color:#fff; background:var(--accent,var(--focus));
@@ -157,6 +161,7 @@
     <button id="main">开始</button>
     <button id="reset" title="重置">↺</button>
   </div>
+  <div id="skip" title="已经歇过了?直接进下一段">跳过这次休息 →</div>
 </div>
 <div id="log" title="点击查看一年内记录"></div>
 <div id="hist"></div>
@@ -626,6 +631,25 @@
     save();
     setMode(SEQ[i]);
   }
+  // 跳过当前这次休息:问一句是"歇过了"(记一个)还是"没歇"(不记),然后进下一段
+  function skipBreak(){
+    var pos = log.seq.length;
+    if(running || mode==='focus' || mode==='free' || SEQ[pos]!==mode) return;
+    checkDay();
+    var k = (mode==='short') ? 's' : 'l';
+    var did = false;
+    try{
+      did = window.confirm(
+        '这次'+(mode==='short'?'短休':'长休')+'其实已经歇过了吗?\n\n'+
+        '确定 = 歇过了,记一个 '+MODES[mode].icon+'\n'+
+        '取消 = 没歇,直接跳过,不记录');
+    }catch(e){ did = false }
+    if(did){ log[k] = (log[k]||0) + 1; addOrder(k); }
+    log.seq.push(MODES[mode].icon);
+    if(log.seq.length >= SEQ.length) log.seq = [];
+    save();
+    setMode(SEQ[log.seq.length] || 'focus');
+  }
   function renderExtra(){
     var ex = log.ex || [], h='';
     for(var i=0;i<ex.length;i++) h += '<i>'+ex[i]+'</i>';
@@ -666,6 +690,9 @@
     bar.style.stroke = MODES[mode].color;
     bar.style.strokeDashoffset = C*(1-Math.min(1, remaining/MODES[mode].sec));
     document.getElementById('main').textContent = running?'暂停':'开始';
+    var canSkip = !running && !editing && mode!=='focus' && mode!=='free'
+                  && SEQ[log.seq.length]===mode;      // 没跑或跑到一半停了,都能跳
+    document.getElementById('skip').className = canSkip ? 'on' : '';
     var tabs={focus:'t-focus',short:'t-short',long:'t-long',free:'t-free'};
     for(var k in tabs) document.getElementById(tabs[k]).className = (k===mode?'on':'');
     renderExtra();
@@ -787,6 +814,7 @@
   document.getElementById('t-short').onclick=function(){ guard('short', function(){ setMode('short') }) };
   document.getElementById('t-long').onclick=function(){ guard('long', function(){ setMode('long') }) };
   document.getElementById('t-free').onclick=function(){ guard('free', function(){ setMode('free') }) };
+  document.getElementById('skip').onclick = skipBreak;
   // 点击右下角记录 → 查看一年内每日历史
   var histEl = document.getElementById('hist');
   function renderHist(){

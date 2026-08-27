@@ -157,6 +157,79 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     dom.window.close();
   }
 
+  const afterFocus = () => ({
+    [DAY]: { seq: ['🍅'], ex: [], o: 'f', rounds: 0, f: 1, s: 0, l: 0, x: 0, u: Date.now() },
+  });
+  const skipEl = dom => dom.window.document.getElementById('skip');
+
+  console.log('\n[7] 「跳过这次休息」只在轮到休息、没开始计时的时候出现');
+  {
+    const dom = boot({ localStore: afterFocus() });
+    await wait(250);
+    const d = dom.window.document;
+    ok('刚做完一个番茄,轮到短休', /休息一下/.test(hint(dom)), hint(dom));
+    ok('跳过链接可见', skipEl(dom).className === 'on', skipEl(dom).className);
+    d.getElementById('main').click();                    // 开始计时
+    await wait(60);
+    ok('计时中隐藏', skipEl(dom).className === '', skipEl(dom).className);
+    d.getElementById('main').click();                    // 暂停
+    await wait(60);
+    ok('中途暂停也能跳(歇到一半被叫走的情况)', skipEl(dom).className === 'on', skipEl(dom).className);
+    d.getElementById('t-focus').click();                 // 切到专注
+    await wait(60);
+    ok('专注模式下隐藏', skipEl(dom).className === '', skipEl(dom).className);
+    dom.window.close();
+  }
+
+  console.log('\n[8] 聊了 15 分钟回来:跳过短休,选"歇过了"');
+  {
+    const dom = boot({ localStore: afterFocus(), confirmResult: true });
+    await wait(250);
+    skipEl(dom).click();
+    await wait(80);
+    const s = readLocal(dom)[DAY];
+    ok('记了 1 个 ☕', s.s === 1, 's=' + s.s);
+    ok('顺序串 fs', s.o === 'fs', s.o);
+    ok('进到第 2 个番茄', /保持专注/.test(hint(dom)), hint(dom));
+    ok('25:00 待命', clock(dom) === '25:00', clock(dom));
+    ok('瓶里 2 个', jarCount(dom) === 2, jarCount(dom));
+    ok('跳过链接收起', skipEl(dom).className === '', skipEl(dom).className);
+    dom.window.close();
+  }
+
+  console.log('\n[9] 跳过短休,选"没歇":位置前进,不记录');
+  {
+    const dom = boot({ localStore: afterFocus(), confirmResult: false });
+    await wait(250);
+    skipEl(dom).click();
+    await wait(80);
+    const s = readLocal(dom)[DAY];
+    ok('☕ 仍是 0', s.s === 0, 's=' + s.s);
+    ok('顺序串仍是 f', s.o === 'f', s.o);
+    ok('进到第 2 个番茄', /保持专注/.test(hint(dom)), hint(dom));
+    ok('位置在第 3 格', s.seq.length === 2, JSON.stringify(s.seq));
+    dom.window.close();
+  }
+
+  console.log('\n[10] 一轮末尾跳过长休 → 回到新一轮开头');
+  {
+    const dom = boot({
+      localStore: { [DAY]: { seq: ['🍅','☕','🍅','☕','🍅','☕','🍅'], ex: [], o: 'fsfsfsf',
+                            rounds: 0, f: 4, s: 3, l: 0, x: 0, u: Date.now() } },
+      confirmResult: false,
+    });
+    await wait(250);
+    ok('轮到长休', /好好休息/.test(hint(dom)), hint(dom));
+    ok('跳过链接可见', skipEl(dom).className === 'on');
+    skipEl(dom).click();
+    await wait(80);
+    const s = readLocal(dom)[DAY];
+    ok('本轮归零', s.seq.length === 0, JSON.stringify(s.seq));
+    ok('回到专注', /保持专注/.test(hint(dom)), hint(dom));
+    ok('长休没被记', s.l === 0, 'l=' + s.l);
+    dom.window.close();
+  }
+
   console.log('\n────────────────');
   console.log(pass + ' 通过, ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);
