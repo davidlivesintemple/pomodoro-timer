@@ -230,6 +230,45 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     dom.window.close();
   }
 
+  console.log('\n[11] 本地和云端各有一个在跑的计时 → 不能叠成两个,完成只算一次');
+  {
+    const endAt = Date.now() + 1200;
+    const cloud = makeCloud({
+      _run: { mode: 'focus', endAt, remaining: 1500, running: true, freeSec: 900, u: Date.now() },
+    });
+    const dom = boot({
+      localStore: { _run: { mode: 'focus', endAt, remaining: 1500, running: true, freeSec: 900, u: Date.now() - 5000 } },
+      cloud,
+    });
+    await wait(3200);                                   // 到点后再多等 2 秒
+    const s = readLocal(dom);
+    const day = Object.keys(s).filter(k => !k.startsWith('_'))[0];
+    ok('只记了 1 个 🍅,没有被反复触发', s[day] && s[day].f === 1, 'f=' + (s[day] && s[day].f));
+    ok('已经停下来', btn(dom) === '开始', btn(dom));
+    ok('进入短休', /休息一下/.test(hint(dom)), hint(dom));
+    dom.window.close();
+  }
+
+  console.log('\n[12] 完成时不再出声,改为圆环抖动');
+  {
+    const dom = boot({});
+    await wait(200);
+    const d = dom.window.document;
+    let audioCalls = 0;
+    dom.window.AudioContext = function(){ audioCalls++; throw new Error('should not be used'); };
+    d.getElementById('clock').click();
+    await wait(30);
+    const inp = d.getElementById('clock-in');
+    inp.value = '0:01';
+    inp.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    await wait(50);
+    d.getElementById('main').click();
+    await wait(1500);
+    ok('没有调用音频', audioCalls === 0, 'AudioContext 调用 ' + audioCalls + ' 次');
+    ok('圆环收到抖动', d.querySelector('.ring').classList.contains('buzz'));
+    dom.window.close();
+  }
+
   console.log('\n────────────────');
   console.log(pass + ' 通过, ' + fail + ' 失败');
   process.exit(fail ? 1 : 0);

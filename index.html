@@ -48,6 +48,8 @@
   }
   .ring{ position:relative; width:230px; height:230px; margin:0 auto 18px }
   .ring svg{ transform:rotate(-90deg) }
+  .ring.buzz{ animation:shake .2s 5 }                /* 完成时抖 5 下,代替铃声 */
+  @keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
   .ring circle{ fill:none; stroke-width:8; stroke-linecap:round }
   .ring .track{ stroke:var(--track) }
   .ring .bar{ stroke:var(--accent,var(--focus)); transition:stroke-dashoffset .3s linear, stroke .3s }
@@ -700,23 +702,20 @@
     renderLog();
     Jar.sync(log, curDay);
   }
-  function beep(){
-    try{
-      var ctx = new (window.AudioContext||window.webkitAudioContext)();
-      [0,.25,.5].forEach(function(t){
-        var o=ctx.createOscillator(), g=ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.frequency.value=880; g.gain.setValueAtTime(.001,ctx.currentTime+t);
-        g.gain.exponentialRampToValueAtTime(.3,ctx.currentTime+t+.02);
-        g.gain.exponentialRampToValueAtTime(.001,ctx.currentTime+t+.2);
-        o.start(ctx.currentTime+t); o.stop(ctx.currentTime+t+.22);
-      });
-    }catch(e){}
+  function buzz(){
+    try{ if(navigator.vibrate) navigator.vibrate([180,90,180,90,180,90,180,90,180]) }catch(e){}
+    var ring = document.querySelector('.ring');
+    if(ring){
+      ring.classList.remove('buzz'); void ring.offsetWidth;   // 重新触发动画
+      ring.classList.add('buzz');
+      setTimeout(function(){ ring.classList.remove('buzz') }, 1200);
+    }
   }
   function stop(){ running=false; if(timer){clearInterval(timer); timer=null} }
   function setMode(m){ disarm(); stop(); mode=m; remaining=MODES[m].sec; render(); saveRun() }
   function finish(){
-    stop(); beep(); checkDay();
+    if(!running) return;           // 只有在跑的计时器才能"完成",防止重复触发
+    stop(); buzz(); checkDay();
     if(mode==='free'){                       // 自由计时只计数,不动 25-5 的循环
       log.x=(log.x||0)+1;
       if(!log.ex) log.ex = [];
@@ -793,7 +792,11 @@
     var m = armMode; armSec = 0; clearTimeout(armT);
     flash('以后 '+MODES[m].label.replace(/ .*/,'')+' 都是 '+fmt(MODES[m].sec));
   };
-  function startTimer(){ running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250); render(); saveRun() }
+  function startTimer(){
+    stop();                        // 先清旧的:叠出两个计时器会让"完成"被反复触发
+    running=true; endAt=Date.now()+remaining*1000; timer=setInterval(tick,250);
+    render(); saveRun();
+  }
   document.getElementById('main').onclick = function(){
     if(running){ stop(); render(); saveRun() }
     else{ startTimer(); }
