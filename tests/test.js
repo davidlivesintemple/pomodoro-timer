@@ -181,11 +181,11 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     dom.window.close();
   }
 
-  console.log('\n[8] 聊了 15 分钟回来:跳过短休,选"歇过了"');
+  console.log('\n[8] 聊了 15 分钟回来:一步点"歇过了",记上并进下一段');
   {
-    const dom = boot({ localStore: afterFocus(), confirmResult: true });
+    const dom = boot({ localStore: afterFocus() });
     await wait(250);
-    skipEl(dom).click();
+    dom.window.document.getElementById('skip-done').click();
     await wait(80);
     const s = readLocal(dom)[DAY];
     ok('记了 1 个 ☕', s.s === 1, 's=' + s.s);
@@ -197,11 +197,11 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     dom.window.close();
   }
 
-  console.log('\n[9] 跳过短休,选"没歇":位置前进,不记录');
+  console.log('\n[9] 一步点"没歇,跳过":位置前进,不记录');
   {
-    const dom = boot({ localStore: afterFocus(), confirmResult: false });
+    const dom = boot({ localStore: afterFocus() });
     await wait(250);
-    skipEl(dom).click();
+    dom.window.document.getElementById('skip-no').click();
     await wait(80);
     const s = readLocal(dom)[DAY];
     ok('☕ 仍是 0', s.s === 0, 's=' + s.s);
@@ -221,12 +221,31 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     await wait(250);
     ok('轮到长休', /好好休息/.test(hint(dom)), hint(dom));
     ok('跳过链接可见', skipEl(dom).className === 'on');
-    skipEl(dom).click();
+    dom.window.document.getElementById('skip-no').click();
     await wait(80);
     const s = readLocal(dom)[DAY];
     ok('本轮归零', s.seq.length === 0, JSON.stringify(s.seq));
     ok('回到专注', /保持专注/.test(hint(dom)), hint(dom));
     ok('长休没被记', s.l === 0, 'l=' + s.l);
+
+    dom.window.close();
+  }
+
+  console.log('\n[10b] 午休一小时回来:一步点"歇过了",长休记上、进新一轮');
+  {
+    const dom = boot({
+      localStore: { [DAY]: { seq: ['🍅','☕','🍅','☕','🍅','☕','🍅'], ex: [], o: 'fsfsfsf',
+                            rounds: 0, f: 4, s: 3, l: 0, x: 0, u: Date.now() } },
+    });
+    await wait(250);
+    ok('轮到长休', /好好休息/.test(hint(dom)), hint(dom));
+    dom.window.document.getElementById('skip-done').click();
+    await wait(80);
+    const s = readLocal(dom)[DAY];
+    ok('长休记上了', s.l === 1, 'l=' + s.l);
+    ok('顺序串以 l 结尾', s.o === 'fsfsfsfl', s.o);
+    ok('本轮归零,新一轮开始', s.seq.length === 0, JSON.stringify(s.seq));
+    ok('回到专注 25:00', /保持专注/.test(hint(dom)), hint(dom));
     dom.window.close();
   }
 
