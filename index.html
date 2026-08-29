@@ -150,7 +150,7 @@
   <div class="tabs">
     <button id="t-focus" class="on">🍅 专注</button>
     <button id="t-short">☕ 短休</button>
-    <button id="t-long">🛋 长休</button>
+    <button id="t-long">💤 长休</button>
     <button id="t-free">⏳ 自由</button>
   </div>
   <div class="extra" id="extra" title="循环之外额外完成的时段"></div>
@@ -180,7 +180,7 @@
   var MODES = {
     focus:{sec:25*60, label:'保持专注', color:'var(--focus)', icon:'🍅'},
     short:{sec: 5*60, label:'休息一下', color:'var(--break)', icon:'☕'},
-    long :{sec:20*60, label:'好好休息', color:'var(--long)', icon:'🛋'},
+    long :{sec:20*60, label:'好好休息', color:'var(--long)', icon:'💤'},
     // 自由计时:时长由你定,点圆圈里的时间改。它不参与 25-5 的循环。
     free :{sec:15*60, label:'自由计时 · 点时间改', color:'var(--free)', icon:'⏳'}
   };
@@ -370,7 +370,7 @@
   // 全靠 CSS 动画,静止时不跑任何循环,手机不发烫。
   var Jar = (function(){
     var jarEl, bottleEl, shown = '', box = null, pile = 0;
-    var KINDS = { f:'🍅', s:'☕', l:'🛋', x:'⏳' };
+    var KINDS = { f:'🍅', s:'☕', l:'💤', x:'⏳' };
     var SIZE  = { f:1.00, s:0.66, l:0.86, x:0.74 };   // 25 分钟本来就比 5 分钟"重"
     var CAP = 40;
 
@@ -616,12 +616,12 @@
     var add = {
       f: cnt(ns,'🍅') - cnt(log.seq,'🍅'),
       s: cnt(ns,'☕') - cnt(log.seq,'☕'),
-      l: cnt(ns,'🛋') - cnt(log.seq,'🛋')
+      l: cnt(ns,'💤') - cnt(log.seq,'💤')
     };
     var skipped = [];
     if(add.f>0) skipped.push('🍅×'+add.f);
     if(add.s>0) skipped.push('☕×'+add.s);
-    if(add.l>0) skipped.push('🛋×'+add.l);
+    if(add.l>0) skipped.push('💤×'+add.l);
     var backfill = false;
     if(skipped.length){
       try{
@@ -678,7 +678,7 @@
     var r = roundsOf(log), p = [];
     if(log.f) p.push('🍅'+log.f);
     if(log.s) p.push('☕'+log.s);
-    if(log.l) p.push('🛋'+log.l);
+    if(log.l) p.push('💤'+log.l);
     if(log.x) p.push('⏳'+log.x);
     if(r)     p.push('✅'+r);
     document.getElementById('log').textContent = p.length ? p.join(' ') : '记录';
@@ -832,7 +832,7 @@
       h += '<div class="row" data-d="'+k+'">'+k.slice(5).replace('-','/')
          + '&nbsp; 🍅×'+(d.f||0)
          + (d.s ? '&nbsp; ☕×'+d.s : '')
-         + (d.l ? '&nbsp; 🛋×'+d.l : '')
+         + (d.l ? '&nbsp; 💤×'+d.l : '')
          + (d.x ? '&nbsp; ⏳×'+d.x : '')
          + (r ? '&nbsp; ✅×'+r : '')
          + '<b class="x" title="删除这一天">×</b></div>';
