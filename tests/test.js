@@ -62,7 +62,7 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     const dom = boot({});
     await wait(200);
     ok('初始 25:00', clock(dom) === '25:00', clock(dom));
-    ok('按钮「开始」', btn(dom) === '开始', btn(dom));
+    ok('按钮「开始」', btn(dom) === 'START', btn(dom));
     dom.window.close();
   }
 
@@ -112,7 +112,7 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     ok('顺序串没被污染', s.o === 'fs', s.o);
     ok('瓶里仍是 2 个,没有东西假掉落', jarCount(dom) === 2, jarCount(dom));
     ok('位置到了第 5 格', s.seq.length === 4, JSON.stringify(s.seq));
-    ok('模式是专注', /保持专注/.test(hint(dom)), hint(dom));
+    ok('模式是专注', /Stay focused/.test(hint(dom)), hint(dom));
 
     // 再跳一次也不会追补
     d.getElementById('strip').children[6].click();      // 第 4 个 🍅
@@ -140,7 +140,7 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     const s = readLocal(dom)[DAY];
     ok('真跑完的 🍅 计入', s.f === 2, 'f=' + s.f);
     ok('顺序串是 fsf', s.o === 'fsf', s.o);
-    ok('位置推进到短休', /休息一下/.test(hint(dom)), hint(dom));
+    ok('位置推进到短休', /Take a breather/.test(hint(dom)), hint(dom));
     dom.window.close();
   }
 
@@ -167,7 +167,7 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     const dom = boot({ localStore: afterFocus() });
     await wait(250);
     const d = dom.window.document;
-    ok('刚做完一个番茄,轮到短休', /休息一下/.test(hint(dom)), hint(dom));
+    ok('刚做完一个番茄,轮到短休', /Take a breather/.test(hint(dom)), hint(dom));
     ok('跳过链接可见', skipEl(dom).className === 'on', skipEl(dom).className);
     d.getElementById('main').click();                    // 开始计时
     await wait(60);
@@ -190,7 +190,7 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     const s = readLocal(dom)[DAY];
     ok('记了 1 个 ☕', s.s === 1, 's=' + s.s);
     ok('顺序串 fs', s.o === 'fs', s.o);
-    ok('进到第 2 个番茄', /保持专注/.test(hint(dom)), hint(dom));
+    ok('进到第 2 个番茄', /Stay focused/.test(hint(dom)), hint(dom));
     ok('25:00 待命', clock(dom) === '25:00', clock(dom));
     ok('瓶里 2 个', jarCount(dom) === 2, jarCount(dom));
     ok('跳过链接收起', skipEl(dom).className === '', skipEl(dom).className);
@@ -206,7 +206,7 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     const s = readLocal(dom)[DAY];
     ok('☕ 仍是 0', s.s === 0, 's=' + s.s);
     ok('顺序串仍是 f', s.o === 'f', s.o);
-    ok('进到第 2 个番茄', /保持专注/.test(hint(dom)), hint(dom));
+    ok('进到第 2 个番茄', /Stay focused/.test(hint(dom)), hint(dom));
     ok('位置在第 3 格', s.seq.length === 2, JSON.stringify(s.seq));
     dom.window.close();
   }
@@ -219,13 +219,13 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
       confirmResult: false,
     });
     await wait(250);
-    ok('轮到长休', /好好休息/.test(hint(dom)), hint(dom));
+    ok('轮到长休', /Rest deeply/.test(hint(dom)), hint(dom));
     ok('跳过链接可见', skipEl(dom).className === 'on');
     dom.window.document.getElementById('skip-no').click();
     await wait(80);
     const s = readLocal(dom)[DAY];
     ok('本轮归零', s.seq.length === 0, JSON.stringify(s.seq));
-    ok('回到专注', /保持专注/.test(hint(dom)), hint(dom));
+    ok('回到专注', /Stay focused/.test(hint(dom)), hint(dom));
     ok('长休没被记', s.l === 0, 'l=' + s.l);
 
     dom.window.close();
@@ -238,14 +238,14 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
                             rounds: 0, f: 4, s: 3, l: 0, x: 0, u: Date.now() } },
     });
     await wait(250);
-    ok('轮到长休', /好好休息/.test(hint(dom)), hint(dom));
+    ok('轮到长休', /Rest deeply/.test(hint(dom)), hint(dom));
     dom.window.document.getElementById('skip-done').click();
     await wait(80);
     const s = readLocal(dom)[DAY];
     ok('长休记上了', s.l === 1, 'l=' + s.l);
     ok('顺序串以 l 结尾', s.o === 'fsfsfsfl', s.o);
     ok('本轮归零,新一轮开始', s.seq.length === 0, JSON.stringify(s.seq));
-    ok('回到专注 25:00', /保持专注/.test(hint(dom)), hint(dom));
+    ok('回到专注 25:00', /Stay focused/.test(hint(dom)), hint(dom));
     dom.window.close();
   }
 
@@ -263,8 +263,8 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     const s = readLocal(dom);
     const day = Object.keys(s).filter(k => !k.startsWith('_'))[0];
     ok('只记了 1 个 🍅,没有被反复触发', s[day] && s[day].f === 1, 'f=' + (s[day] && s[day].f));
-    ok('已经停下来', btn(dom) === '开始', btn(dom));
-    ok('进入短休', /休息一下/.test(hint(dom)), hint(dom));
+    ok('已经停下来', btn(dom) === 'START', btn(dom));
+    ok('进入短休', /Take a breather/.test(hint(dom)), hint(dom));
     dom.window.close();
   }
 

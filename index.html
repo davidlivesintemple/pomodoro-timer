@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>番茄钟</title>
+<title>TomatoJar</title>
 <style>
   :root{
     --bg:#ffffff; --fg:#37352f; --muted:#9b9a97; --track:#eeedeb;
@@ -77,7 +77,7 @@
   .btns button{ font-family:inherit; font-size:15px; border-radius:10px; cursor:pointer; padding:10px 0 }
   #main{
     width:150px; border:0; color:#fff; background:var(--accent,var(--focus));
-    font-weight:600; letter-spacing:4px; box-shadow:0 3px 0 rgba(0,0,0,.18);
+    font-weight:600; letter-spacing:2px; box-shadow:0 3px 0 rgba(0,0,0,.18);
   }
   #main:active{ transform:translateY(2px); box-shadow:0 1px 0 rgba(0,0,0,.18) }
   #reset{ width:64px; border:1.5px solid var(--track); background:transparent; color:var(--muted) }
@@ -148,41 +148,41 @@
 <div id="jar"></div>
 <div class="card">
   <div class="tabs">
-    <button id="t-focus" class="on">🍅 专注</button>
-    <button id="t-short">☕ 短休</button>
-    <button id="t-long">🏖 长休</button>
-    <button id="t-free">⏳ 自由</button>
+    <button id="t-focus" class="on">🍅 Focus</button>
+    <button id="t-short">☕ Short Break</button>
+    <button id="t-long">🏖 Long Break</button>
+    <button id="t-free">⏳ Free</button>
   </div>
-  <div class="extra" id="extra" title="循环之外额外完成的时段"></div>
-  <div class="strip" id="strip" title="本轮进度:25-5-25-5-25-5-25-20,点击可设置当前位置"></div>
+  <div class="extra" id="extra" title="Extra sessions outside the cycle"></div>
+  <div class="strip" id="strip" title="Round: 25-5-25-5-25-5-25-20 · tap to jump"></div>
   <div class="ring">
     <svg width="230" height="230" viewBox="0 0 230 230">
       <circle class="track" cx="115" cy="115" r="106"></circle>
       <circle class="bar" id="bar" cx="115" cy="115" r="106"></circle>
     </svg>
-    <div class="time"><b id="clock" title="点击修改剩余时间">25:00</b><span id="hint">保持专注</span></div>
+    <div class="time"><b id="clock" title="Tap to edit the time">25:00</b><span id="hint">Stay focused</span></div>
   </div>
   <div class="btns">
-    <button id="main">开始</button>
-    <button id="reset" title="重置">↺</button>
+    <button id="main">START</button>
+    <button id="reset" title="Reset">↺</button>
   </div>
   <div id="skip">
-    <span id="skip-done" title="午休、散步…这段休息其实歇过了,记上并进下一段">歇过了,记上 ✓</span>
+    <span id="skip-done" title="A nap or a walk counts — log this break and move on">Rested — log it ✓</span>
     <span class="sep">·</span>
-    <span id="skip-no" title="没歇,不记录,直接进下一段">没歇,跳过</span>
+    <span id="skip-no" title="Didn't rest — move on without logging">Skip — no log</span>
   </div>
 </div>
-<div id="log" title="点击查看一年内记录"></div>
+<div id="log" title="Tap for the past year"></div>
 <div id="hist"></div>
-<div id="dot" title="同步状态"></div>
+<div id="dot" title="Sync status"></div>
 <script>
 (function(){
   var MODES = {
-    focus:{sec:25*60, label:'保持专注', color:'var(--focus)', icon:'🍅'},
-    short:{sec: 5*60, label:'休息一下', color:'var(--break)', icon:'☕'},
-    long :{sec:20*60, label:'好好休息', color:'var(--long)', icon:'🏖'},
+    focus:{sec:25*60, label:'Stay focused', color:'var(--focus)', icon:'🍅'},
+    short:{sec: 5*60, label:'Take a breather', color:'var(--break)', icon:'☕'},
+    long :{sec:20*60, label:'Rest deeply', color:'var(--long)', icon:'🏖'},
     // 自由计时:时长由你定,点圆圈里的时间改。它不参与 25-5 的循环。
-    free :{sec:15*60, label:'自由计时 · 点时间改', color:'var(--free)', icon:'⏳'}
+    free :{sec:15*60, label:'Free timer · tap to set', color:'var(--free)', icon:'⏳'}
   };
   // 各时段时长可以改;改过就一直用,并跟着云端同步到另一台设备
   function applyCfg(c){
@@ -272,7 +272,7 @@
     }
     if(r.running){                  // 人不在的时候跑完了,不替你计数
       remaining = 0; running = false;
-      flash('上次计时已结束');
+      flash('Previous timer already ended');
     }else{
       remaining = left > 0 ? left : MODES[mode].sec;
     }
@@ -604,7 +604,7 @@
     if(!running){ fn(); return }
     var now=Date.now();
     if(pendKey===key && now-pendAt<3000){ pendKey=null; flashMsg=null; fn(); }
-    else{ pendKey=key; pendAt=now; flash('计时中,再点一次确认') }
+    else{ pendKey=key; pendAt=now; flash('Running — tap again to confirm') }
   }
   // 点击进度条某一格 → 把本轮位置挪到那里。
   // 挪指针本身不改记录:往回挪不抹掉做过的,往前挪也不凭空多出没做过的。
@@ -626,9 +626,9 @@
     if(skipped.length){
       try{
         backfill = window.confirm(
-          '中间的 '+skipped.join(' ')+' 其实已经做过了吗?\n\n'+
-          '确定 = 做过,补进今天的记录\n'+
-          '取消 = 没做,只是跳过去,不记录');
+          'Log the skipped '+skipped.join(' ')+' as completed?\n\n'+
+          'OK = I did them, add to today\n'+
+          'Cancel = I didn\'t, just move the pointer');
       }catch(e){ backfill = false }   // 弹窗被拦时宁可少记,不凭空多记
     }
     if(backfill){
@@ -681,20 +681,20 @@
     if(log.l) p.push('🏖'+log.l);
     if(log.x) p.push('⏳'+log.x);
     if(r)     p.push('✅'+r);
-    document.getElementById('log').textContent = p.length ? p.join(' ') : '记录';
+    document.getElementById('log').textContent = p.length ? p.join(' ') : 'log';
   }
   function fmt(s){ var m=Math.floor(s/60), r=s%60; return (m<10?'0':'')+m+':'+(r<10?'0':'')+r }
   function render(){
     if(!editing) clockEl.textContent = fmt(remaining);
     var hintEl = document.getElementById('hint');
     var armed = armSec > 0 && !flashMsg;
-    hintEl.textContent = flashMsg || (armed ? MODES[mode].label+' · 设为默认' : MODES[mode].label);
+    hintEl.textContent = flashMsg || (armed ? MODES[mode].label+' · set as default' : MODES[mode].label);
     hintEl.className = armed ? 'armed' : '';
     hintEl.style.color = (flashMsg || armed) ? 'var(--accent,var(--focus))' : '';
     document.documentElement.style.setProperty('--accent', MODES[mode].color);
     bar.style.stroke = MODES[mode].color;
     bar.style.strokeDashoffset = C*(1-Math.min(1, remaining/MODES[mode].sec));
-    document.getElementById('main').textContent = running?'暂停':'开始';
+    document.getElementById('main').textContent = running?'PAUSE':'START';
     var canSkip = !running && !editing && mode!=='focus' && mode!=='free'
                   && SEQ[log.seq.length]===mode;      // 没跑或跑到一半停了,都能跳
     document.getElementById('skip').className = canSkip ? 'on' : '';
@@ -778,7 +778,7 @@
             else arm();                                    // 其余先只用这一次,想长期用就点"设为默认"
           }
         }
-        else if(v) flash('时间格式如 12:30');
+        else if(v) flash('Use a format like 12:30');
       }
       render();
       saveRun();
@@ -793,7 +793,7 @@
     if(!(armSec > 0)) return;
     setCfg(armMode, armSec);
     var m = armMode; armSec = 0; clearTimeout(armT);
-    flash('以后 '+MODES[m].label.replace(/ .*/,'')+' 都是 '+fmt(MODES[m].sec));
+    flash('Default saved · '+fmt(MODES[m].sec));
   };
   function startTimer(){
     stop();                        // 先清旧的:叠出两个计时器会让"完成"被反复触发
@@ -835,15 +835,15 @@
          + (d.l ? '&nbsp; 🏖×'+d.l : '')
          + (d.x ? '&nbsp; ⏳×'+d.x : '')
          + (r ? '&nbsp; ✅×'+r : '')
-         + '<b class="x" title="删除这一天">×</b></div>';
+         + '<b class="x" title="Delete this day">×</b></div>';
     }
-    histEl.innerHTML = h || '<div>暂无记录</div>';
+    histEl.innerHTML = h || '<div>Nothing yet</div>';
     var xs = histEl.querySelectorAll('.x');
     for(var j=0;j<xs.length;j++){
       xs[j].onclick = function(e){
         e.stopPropagation();
         var k = this.parentNode.getAttribute('data-d');
-        if(!confirm('删除 '+k+' 的记录?')) return;
+        if(!confirm('Delete '+k+'?')) return;
         store[k] = { del:1, u:Date.now() };   // 墓碑,让另一台设备也删掉
         if(k===curDay) log = useDay(curDay);
         try{ localStorage.setItem('pomo-hist', JSON.stringify(store)) }catch(e2){}
