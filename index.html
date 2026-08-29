@@ -101,6 +101,7 @@
   #jar.init .it{ transition:none }
   .it .dy{ display:block; width:100%; height:100% }
   .it .dx{ display:block; width:100%; height:100%; transform:rotate(var(--set,0deg)) }
+  .it .em svg{ display:block; width:94%; height:94%; margin:auto }
   .it .em{                                          /* 装 emoji 的那一层 */
     display:flex; align-items:center; justify-content:center;
     width:100%; height:100%; text-decoration:none;
@@ -370,7 +371,8 @@
   // 全靠 CSS 动画,静止时不跑任何循环,手机不发烫。
   var Jar = (function(){
     var jarEl, bottleEl, shown = '', box = null, pile = 0;
-    var KINDS = { f:'🍅', s:'☕', l:'🏖', x:'⏳' };
+    // 瓶子里的番茄用自绘的圆脸卡通版(emoji 的形状改不了);其余仍是 emoji
+    var KINDS = { f:'<svg viewBox=\'0 0 32 32\' aria-hidden=\'true\'><circle cx=\'16\' cy=\'17.6\' r=\'13.2\' fill=\'#ec5a52\'/><ellipse cx=\'11\' cy=\'12.4\' rx=\'3.4\' ry=\'2\' transform=\'rotate(-28 11 12.4)\' fill=\'#fff\' opacity=\'.35\'/><path d=\'M16 4.6 C14.4 2.4 11.6 2 9.9 2.7 c1.3 1.9 3.4 2.7 5.1 2.8 Z\' fill=\'#43a05c\'/><path d=\'M16 4.6 C17.6 2.4 20.4 2 22.1 2.7 c-1.3 1.9 -3.4 2.7 -5.1 2.8 Z\' fill=\'#43a05c\'/><circle cx=\'16\' cy=\'4.4\' r=\'1.4\' fill=\'#3a8a50\'/><ellipse cx=\'9.6\' cy=\'20.6\' rx=\'2\' ry=\'1.2\' fill=\'#ffb3ad\' opacity=\'.55\'/><ellipse cx=\'22.4\' cy=\'20.6\' rx=\'2\' ry=\'1.2\' fill=\'#ffb3ad\' opacity=\'.55\'/><circle cx=\'11.8\' cy=\'17.4\' r=\'1.3\' fill=\'#57201d\'/><circle cx=\'20.2\' cy=\'17.4\' r=\'1.3\' fill=\'#57201d\'/><path d=\'M12.8 21.2 q3.2 2.6 6.4 0\' stroke=\'#57201d\' stroke-width=\'1.6\' fill=\'none\' stroke-linecap=\'round\'/></svg>', s:'☕', l:'🏖', x:'⏳' };
     var SIZE  = { f:1.00, s:0.66, l:0.86, x:0.74 };   // 25 分钟本来就比 5 分钟"重"
     var CAP = 40;
 
@@ -531,7 +533,7 @@
         if(i < kids.length){
           e = kids[i];
           e.setAttribute('data-k', items[i].k);
-          e.querySelector('.em').textContent = KINDS[items[i].k];
+          e.querySelector('.em').innerHTML = KINDS[items[i].k];
         }else{
           e = el(items[i]);
           jarEl.appendChild(e);
