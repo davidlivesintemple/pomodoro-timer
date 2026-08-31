@@ -268,23 +268,62 @@ const jarCount = dom => dom.window.document.querySelectorAll('#jar .it').length;
     dom.window.close();
   }
 
-  console.log('\n[12] 完成时不再出声,改为圆环抖动');
+  console.log('\n[12] 完成时响 5 声(峰值 .5),圆环同步抖动');
   {
     const dom = boot({});
     await wait(200);
     const d = dom.window.document;
-    let audioCalls = 0;
-    dom.window.AudioContext = function(){ audioCalls++; throw new Error('should not be used'); };
+    // 假音频上下文:数一共响几声、记录最大音量
+    let ctxCount = 0, beeps = 0, peak = 0;
+    dom.window.AudioContext = function () {
+      ctxCount++;
+      this.currentTime = 0;
+      this.state = 'running';
+      this.destination = {};
+      this.resume = () => {};
+      this.createOscillator = () => ({ connect() {}, start() { beeps++; }, stop() {}, frequency: {} });
+      this.createGain = () => ({
+        connect() {},
+        gain: {
+          setValueAtTime() {},
+          exponentialRampToValueAtTime(v) { if (v > peak) peak = v; },
+        },
+      });
+    };
     d.getElementById('clock').click();
     await wait(30);
     const inp = d.getElementById('clock-in');
     inp.value = '0:01';
+    // 这次 Enter 会冒泡到 document,顺带模拟"用户手势解锁音频"
     inp.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     await wait(50);
     d.getElementById('main').click();
     await wait(1500);
-    ok('没有调用音频', audioCalls === 0, 'AudioContext 调用 ' + audioCalls + ' 次');
+    ok('音频上下文只建一个', ctxCount === 1, 'ctxCount=' + ctxCount);
+    ok('响了 5 声', beeps === 5, 'beeps=' + beeps);
+    ok('峰值音量 .5(比旧版 .3 响)', peak === 0.5, 'peak=' + peak);
     ok('圆环收到抖动', d.querySelector('.ring').classList.contains('buzz'));
+    dom.window.close();
+  }
+
+  console.log('\n[13] 没有用户手势解锁音频时,完成不报错也不出声');
+  {
+    const dom = boot({});   // boot 里的 AudioContext 是会抛错的假货,unlockAudio 必须吞掉它
+    await wait(200);
+    const d = dom.window.document;
+    let threw = false;
+    try {
+      d.getElementById('clock').click();
+      await wait(30);
+      const inp = d.getElementById('clock-in');
+      inp.value = '0:01';
+      inp.dispatchEvent(new dom.window.KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      await wait(50);
+      d.getElementById('main').click();
+      await wait(1500);
+    } catch (e) { threw = true; }
+    ok('全程无异常', !threw);
+    ok('计时器照常完成并抖动', d.querySelector('.ring').classList.contains('buzz'));
     dom.window.close();
   }
 

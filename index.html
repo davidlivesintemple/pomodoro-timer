@@ -48,7 +48,7 @@
   }
   .ring{ position:relative; width:230px; height:230px; margin:0 auto 18px }
   .ring svg{ transform:rotate(-90deg) }
-  .ring.buzz{ animation:shake .2s 5 }                /* 完成时抖 5 下,代替铃声 */
+  .ring.buzz{ animation:shake .2s 5 }                /* 完成时抖 5 下,与 5 声提示音同步 */
   @keyframes shake{ 0%,100%{transform:translateX(0)} 25%{transform:translateX(-7px)} 75%{transform:translateX(7px)} }
   .ring circle{ fill:none; stroke-width:8; stroke-linecap:round }
   .ring .track{ stroke:var(--track) }
@@ -707,7 +707,36 @@
     renderLog();
     Jar.sync(log, curDay);
   }
+  // 完成音:5 声短哔,峰值 .5(旧版三声铃峰值 .3,按要求再响一点)。
+  // iOS 只允许在用户手势里解锁音频,所以第一次点击/按键时先把上下文建好备用。
+  var audio = null;
+  function unlockAudio(){
+    try{
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if(!AC) return;
+      if(!audio) audio = new AC();
+      if(audio.state === 'suspended') audio.resume();
+    }catch(e){}
+  }
+  document.addEventListener('pointerdown', unlockAudio, true);
+  document.addEventListener('keydown', unlockAudio, true);
+  function chime(){
+    try{
+      if(!audio) return;
+      for(var i=0;i<5;i++){
+        var t = audio.currentTime + i*0.27;        // 与震动的 180+90ms 节奏对齐
+        var o = audio.createOscillator(), g = audio.createGain();
+        o.connect(g); g.connect(audio.destination);
+        o.frequency.value = 880;
+        g.gain.setValueAtTime(.001, t);
+        g.gain.exponentialRampToValueAtTime(.5, t+.02);
+        g.gain.exponentialRampToValueAtTime(.001, t+.18);
+        o.start(t); o.stop(t+.2);
+      }
+    }catch(e){}
+  }
   function buzz(){
+    chime();
     try{ if(navigator.vibrate) navigator.vibrate([180,90,180,90,180,90,180,90,180]) }catch(e){}
     var ring = document.querySelector('.ring');
     if(ring){
